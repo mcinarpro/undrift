@@ -20,7 +20,8 @@ Undrift watches someone's own work, so the bridge is a read-only observer:
   Claude Code writes for its resume picker. Prompt text, file contents and tool output stay
   inside the parser and never reach the window or the cache.
 - In a Project folder it runs `git` and `gh` read-only: never `fetch`, never a write. Every
-  `gh` call has a timeout. From git it takes numbers and file names, never file contents.
+  `gh` call has a timeout. From git it takes numbers, file names, the branch, the commit subject
+  and the `origin` URL, never file contents.
 - Over the network it reaches only GitHub: `gh` read-only for Issues and the NavUser, and that
   account's avatar, cached on disk. It never writes to GitHub.
 - It calls no model. The only processes it starts are terminals running `claude`: in a
