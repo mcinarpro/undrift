@@ -1,0 +1,118 @@
+/* Undrift's tokens, one value per theme (DESIGN.md § Colour), taken from Vercel's Geist scales.
+   Prefixed so they never collide with shadcn's own names (its --accent is a hover background). */
+
+:root {
+  color-scheme: light;
+  --ud-bg: #fafafa; /* background-200 */
+  --ud-rail: #fafafa;
+  --ud-surface: #ffffff; /* background-100 */
+  --ud-raised: #f2f2f2; /* gray-100 */
+  --ud-line: #ebebeb; /* gray-400 */
+  --ud-line-strong: #c9c9c9; /* gray-500 */
+  --ud-text: #171717; /* gray-1000 */
+  --ud-text-2: #4d4d4d; /* gray-900 */
+  --ud-muted: #666666; /* Geist's gray-700 (#8f8f8f) fails AA for text */
+  --ud-accent: #0072f5; /* blue-700: marks only – strip cells, the In Motion dot and Badge tint, the Gauge value, the drop-target ring */
+  --ud-accent-text: #0068d6; /* blue-900: blue-700 is 4.3:1 on the page, under AA */
+  /* Geist's primary button is gray-1000, not blue: blue stays for marks, links and focus. */
+  --ud-button: #171717; /* gray-1000 · white on it 17.9:1 */
+  --ud-button-hover: #383838; /* a solid step, so the label keeps its contrast on hover */
+  --ud-on-button: #ffffff;
+  /* Geist's gauge track: translucent, so the strip and the ring stay visible on the raised box too.
+     Defined once, because --ud-alpha-400 already changes with the theme. */
+  --ud-cell-off: var(--ud-alpha-400);
+  --ud-drifting: #ffb224; /* amber-700 */
+  --ud-drifting-text: #a35200; /* amber-900: the Drifting Badge's word, 5.1:1 on its tint */
+  /* The Area colours (Radix step 9): an Area's swatch is one, never blue or amber, which mean
+     In motion and Drifting. */
+  --ud-area-purple: #8e4ec6;
+  --ud-area-green: #30a46c;
+  --ud-area-pink: #d6409f;
+  --ud-area-teal: #12a594;
+  --ud-area-gray: #8d8d8d;
+  --ud-parked: #a8a8a8; /* gray-600 */
+  --ud-focus: #0072f5; /* --ds-focus-color: blue-700 */
+  --ud-overlay: #f2f2f2; /* gray-100 · Geist's dialog backdrop, laid at 80% */
+  --ud-shimmer: #ebebeb; /* gray-200 · the light that sweeps across a Skeleton */
+  /* Geist's gray-alpha scale: translucent steps that read the same on any surface. */
+  --ud-alpha-100: #0000000d;
+  --ud-alpha-200: #00000014;
+  --ud-alpha-400: #00000014;
+  --ud-alpha-500: #00000036;
+  --ud-alpha-600: #00000057;
+  --ud-error-text: #cb2a2f; /* red-900 */
+  --ud-error-fill: #da2f35; /* red-800 */
+  --ud-error-line: #fdd8d8; /* red-400 */
+  --ud-error-bg: #ffebeb; /* red-200 */
+  /* A text field's focus frame (--ds-focus-border): a gray-alpha-600 edge inside a soft halo. */
+  --ud-focus-border: 0 0 0 1px var(--ud-alpha-600), 0 0 0 4px #00000029;
+  /* Geist's materials. Each starts with the edge, so a surface takes one shadow utility. */
+  --ud-shadow-small: 0 0 0 1px var(--ud-line), 0 2px 2px #0000000a;
+  --ud-shadow-medium: 0 0 0 1px var(--ud-line), 0 2px 2px #0000000a, 0 8px 8px -8px #0000000a;
+  --ud-shadow-menu: 0 0 0 1px var(--ud-line), 0 1px 1px #00000005, 0 4px 8px -4px #0000000a, 0 16px 24px -8px #0000000f;
+  --ud-shadow-modal: 0 0 0 1px var(--ud-line), 0 1px 1px #00000005, 0 8px 16px -4px #0000000a, 0 24px 32px -8px #0000000f;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ud-bg: #000000; /* background-200 */
+  --ud-rail: #000000;
+  --ud-surface: #0a0a0a; /* background-100 */
+  --ud-raised: #1a1a1a; /* gray-100 */
+  --ud-line: #2e2e2e; /* gray-400 */
+  --ud-line-strong: #454545; /* gray-500 */
+  --ud-text: #ededed; /* gray-1000 */
+  --ud-text-2: #a1a1a1; /* gray-900 */
+  --ud-muted: #8f8f8f; /* gray-700 */
+  --ud-accent: #0072f5; /* blue-700 */
+  --ud-accent-text: #52a8ff; /* blue-900 */
+  --ud-button: #ededed; /* gray-1000 */
+  --ud-button-hover: #cccccc;
+  --ud-on-button: #0a0a0a; /* background-100 */
+  --ud-drifting: #ffb224; /* amber-700 */
+  --ud-drifting-text: #f2a20d; /* amber-900 */
+  /* The Area colours (Radix step 9): an Area's swatch is one, never blue or amber, which mean
+     In motion and Drifting. */
+  --ud-area-purple: #8e4ec6;
+  --ud-area-green: #30a46c;
+  --ud-area-pink: #d6409f;
+  --ud-area-teal: #12a594;
+  --ud-area-gray: #8d8d8d;
+  --ud-parked: #878787; /* gray-600 */
+  --ud-focus: #52a8ff; /* --ds-focus-color is blue-900 in dark */
+  --ud-overlay: #000000; /* background-200 */
+  --ud-shimmer: #1f1f1f; /* gray-200 */
+  --ud-alpha-100: #ffffff0f;
+  --ud-alpha-200: #ffffff17;
+  --ud-alpha-400: #ffffff24;
+  --ud-alpha-500: #ffffff3d;
+  --ud-alpha-600: #ffffff82;
+  --ud-error-text: #ff6166; /* red-900 */
+  --ud-error-fill: #d93036; /* red-800 */
+  --ud-error-line: #671e21; /* red-400 */
+  --ud-error-bg: #3c1618; /* red-200 */
+  --ud-focus-border: 0 0 0 1px var(--ud-alpha-600), 0 0 0 4px #ffffff3d;
+  --ud-shadow-small: 0 0 0 1px var(--ud-line), 0 1px 2px #00000029;
+  --ud-shadow-medium: 0 0 0 1px var(--ud-line), 0 2px 2px #00000052, 0 8px 8px -8px #00000029;
+  --ud-shadow-menu: 0 0 0 1px var(--ud-line), 0 1px 1px #00000005, 0 4px 8px -4px #0000000a, 0 16px 24px -8px #0000000f;
+  --ud-shadow-modal: 0 0 0 1px var(--ud-line), 0 1px 1px #00000005, 0 8px 16px -4px #0000000a, 0 24px 32px -8px #0000000f;
+}
+
+/* Wide-gamut panels get Geist's own P3 blues and amber; sRGB panels keep the hex values above. */
+@media (color-gamut: p3) {
+  @supports (color: oklch(0 0 0)) {
+    :root {
+      --ud-accent: oklch(57.61% 0.2508 258.23);
+      --ud-focus: oklch(57.61% 0.2508 258.23);
+      --ud-accent-text: oklch(53.18% 0.2399 256.99);
+      --ud-drifting: oklch(81.87% 0.1969 76.46);
+    }
+    :root[data-theme="dark"] {
+      --ud-accent: oklch(57.61% 0.2321 258.23);
+      --ud-focus: oklch(71.7% 0.1648 250.794);
+      --ud-accent-text: oklch(71.7% 0.1648 250.794);
+      /* Repeated here, because the dark block above outranks the plain :root rule. */
+      --ud-drifting: oklch(81.87% 0.1969 76.46);
+    }
+  }
+}

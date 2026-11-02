@@ -1,0 +1,271 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist/wght-italic.css";
+@import "@fontsource-variable/geist-mono";
+@import "./styles/theme.css";
+
+/* index.html resolves System to light or dark before the first paint, so data-theme is always set
+   and shadcn's dark: classes follow it. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme inline {
+    --font-sans: "Geist Variable", system-ui, sans-serif;
+    --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+    --font-heading: var(--font-sans);
+    --color-rail: var(--ud-rail);
+    --color-line-strong: var(--ud-line-strong);
+    --color-text-2: var(--ud-text-2);
+    --color-cell-off: var(--ud-cell-off);
+    --color-shimmer: var(--ud-shimmer);
+    --color-drifting: var(--ud-drifting);
+    --color-drifting-text: var(--ud-drifting-text);
+    --color-accent-text: var(--ud-accent-text);
+    --color-mark: var(--ud-accent);
+    --color-parked: var(--ud-parked);
+    --color-button-hover: var(--ud-button-hover);
+    --color-alpha-100: var(--ud-alpha-100);
+    --color-alpha-200: var(--ud-alpha-200);
+    --color-alpha-400: var(--ud-alpha-400);
+    --color-alpha-500: var(--ud-alpha-500);
+    --color-alpha-600: var(--ud-alpha-600);
+    --color-error: var(--ud-error-text);
+    --color-error-fill: var(--ud-error-fill);
+    --color-error-line: var(--ud-error-line);
+    --color-error-bg: var(--ud-error-bg);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    /* Geist's radii are fixed steps, not multiples of one base: 6 px controls, 12 px Panels. */
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+    --radius-2xl: 16px;
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* shadcn's semantic names, mapped onto Undrift's tokens. They follow the theme through the tokens. */
+:root {
+    --background: var(--ud-bg);
+    --foreground: var(--ud-text);
+    --card: var(--ud-surface);
+    --card-foreground: var(--ud-text);
+    --popover: var(--ud-surface);
+    --popover-foreground: var(--ud-text);
+    --primary: var(--ud-button);
+    --primary-foreground: var(--ud-on-button);
+    --secondary: var(--ud-raised);
+    --secondary-foreground: var(--ud-text);
+    --muted: var(--ud-raised);
+    --muted-foreground: var(--ud-muted);
+    --accent: var(--ud-raised);
+    --accent-foreground: var(--ud-text);
+    --destructive: var(--ud-error-text);
+    --border: var(--ud-line);
+    --input: var(--ud-line-strong);
+    --ring: var(--ud-focus);
+    --chart-1: var(--ud-accent);
+    --chart-2: var(--ud-drifting);
+    --chart-3: var(--ud-text-2);
+    --chart-4: var(--ud-muted);
+    --chart-5: var(--ud-parked);
+    --radius: 0.375rem;
+    --sidebar: var(--ud-rail);
+    --sidebar-foreground: var(--ud-text);
+    --sidebar-primary: var(--ud-button);
+    --sidebar-primary-foreground: var(--ud-on-button);
+    --sidebar-accent: var(--ud-raised);
+    --sidebar-accent-foreground: var(--ud-text);
+    --sidebar-border: var(--ud-line);
+    --sidebar-ring: var(--ud-focus);
+}
+
+/* Geist draws edges with a 1 px spread shadow instead of a border: no layout shift, and it
+   composes with elevation (DESIGN.md § Shape). */
+@utility edge {
+    box-shadow: 0 0 0 1px var(--ud-line);
+}
+
+/* Geist's material-small, the Vercel dashboard's card: background-100 inside the edge, with a small
+   drop. The radius stays a separate class, because Undrift's cards come in two (DESIGN.md § Shape). */
+@utility material-small {
+    background-color: var(--ud-surface);
+    box-shadow: var(--ud-shadow-small);
+}
+
+/* Geist's named type styles (vercel.com/geist/typography), with the values of vercel.com's own
+   stylesheet; only the styles a view uses are here. They are prefixed type-, not text-, because cn
+   reads an unknown text-* class as a colour and drops it next to a real one. The sans styles leave
+   the family to html, so a font-mono beside them still applies. A <strong> inside picks out a part
+   of the text, as in Geist (DESIGN.md § Type). */
+@utility type-heading-32 {
+    font-size: 32px;
+    line-height: 40px;
+    font-weight: 600;
+    letter-spacing: -1.28px;
+    & > strong {
+        font-weight: 500;
+        color: var(--ud-text-2);
+    }
+}
+@utility type-heading-24 {
+    font-size: 24px;
+    line-height: 32px;
+    font-weight: 600;
+    letter-spacing: -0.96px;
+    & > strong {
+        font-weight: 500;
+        color: var(--ud-text-2);
+    }
+}
+@utility type-heading-16 {
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 600;
+    letter-spacing: -0.32px;
+    & > strong {
+        font-weight: 500;
+        color: var(--ud-text-2);
+    }
+}
+@utility type-heading-14 {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 600;
+    letter-spacing: -0.28px;
+}
+@utility type-label-14 {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 400;
+    & > strong {
+        font-weight: 500;
+        color: var(--ud-text);
+    }
+}
+@utility type-label-13 {
+    font-size: 13px;
+    line-height: 16px;
+    font-weight: 400;
+    & > strong {
+        font-weight: 500;
+        color: var(--ud-text);
+    }
+}
+@utility type-label-12 {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 400;
+    & > strong {
+        font-weight: 500;
+        color: var(--ud-text);
+    }
+}
+@utility type-label-13-mono {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 20px;
+    font-weight: 400;
+}
+@utility type-copy-14 {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 400;
+    & > strong {
+        font-weight: 550;
+        color: var(--ud-text);
+    }
+}
+@utility type-copy-13 {
+    font-size: 13px;
+    line-height: 18px;
+    font-weight: 400;
+    & > strong {
+        font-weight: 550;
+        color: var(--ud-text);
+    }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  /* vercel.com's body features: Geist's stylistic set 11 on, contextual alternates off.
+     Standard ligatures stay on by default, so they need no entry. */
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "calt" 0, "rlig", "ss11";
+    }
+  /* vercel.com's html rule: kerning and ligatures always, and no faked bold or italic. */
+  html {
+    @apply font-sans;
+    text-rendering: optimizeLegibility;
+    font-synthesis: none;
+    }
+  /* Geist's selection inverts the text: gray-1000 behind, gray-100 in front. */
+  ::selection {
+    background-color: var(--ud-text);
+    color: var(--ud-raised);
+    }
+  /* Geist's double ring (--ds-focus-ring): a gap in background-100, then the focus colour. */
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--ud-surface), 0 0 0 4px var(--ud-focus);
+    }
+  /* a text field shows focus with its caret and its own frame, not the ring */
+  input:focus-visible {
+    box-shadow: none;
+    }
+  /* DESIGN.md promises calm motion: under reduce, every animation and transition ends at once,
+     the generated dialogs and menus included. !important in a layer outranks any utility. */
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+      }
+    }
+}
+
+/* Geist's dialog backdrop: gray-100 (background-200 in dark) at 80%, no blur, fading over 300 ms
+   with the modal. Unlayered on purpose: a layered rule would lose to the generated dialog's
+   bg-black/10 and backdrop-blur utilities, and ui/dialog.tsx stays as generated. The
+   reduced-motion rule above still wins, because its !important outranks any normal rule. */
+[data-slot="dialog-overlay"] {
+    background-color: color-mix(in srgb, var(--ud-overlay) 80%, transparent);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    animation-duration: 300ms;
+}
