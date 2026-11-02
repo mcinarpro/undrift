@@ -1,7 +1,9 @@
 import { useEffect } from "react";
 import { Find } from "@/components/find";
 import { Sidebar } from "@/components/sidebar";
+import { Toaster } from "@/components/toast";
 import { Topbar } from "@/components/topbar";
+import { Home } from "@/pages/home";
 import { Placeholder, TITLES } from "@/pages/placeholder";
 import { useStore } from "@/store";
 
@@ -33,15 +35,17 @@ export default function App() {
   }, [setFindOpen, quit]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar />
-      <div className="flex min-w-0 grow flex-col">
-        <Topbar title={TITLES[page]} />
-        <main className="min-h-0 grow overflow-y-auto">
-          <Placeholder page={page} />
-        </main>
+    <Toaster>
+      <div className="flex h-screen overflow-hidden bg-background">
+        <Sidebar />
+        <div className="flex min-w-0 grow flex-col">
+          <Topbar title={TITLES[page]} />
+          <main className="min-h-0 grow overflow-y-auto">
+            {page === "home" ? <Home /> : <Placeholder page={page} />}
+          </main>
+        </div>
+        <Find />
       </div>
-      <Find />
-    </div>
+    </Toaster>
   );
 }

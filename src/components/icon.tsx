@@ -1,16 +1,21 @@
 import {
   ChevronsUpDown,
+  Ellipsis,
   ExternalLink,
   Folders,
+  GitBranch,
+  GitCommitHorizontal,
   House,
   LogOut,
   Minus,
   Monitor,
   Moon,
   Network,
+  Play,
   Search,
   Settings,
   Square,
+  SquareTerminal,
   Sun,
   X,
 } from "lucide-react";
@@ -33,6 +38,11 @@ const ICONS = {
   minimize: Minus,
   maximize: Square,
   close: X,
+  resume: Play,
+  start: SquareTerminal,
+  more: Ellipsis,
+  branch: GitBranch,
+  commit: GitCommitHorizontal,
 } as const;
 
 export type IconName = keyof typeof ICONS;

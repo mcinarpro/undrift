@@ -4,7 +4,7 @@
 //! no fetch, no write, so a row is only as fresh as the checkout.
 
 use serde::Serialize;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 use std::process::Command;
 
@@ -24,6 +24,22 @@ pub struct Repo {
     pub unpushed: Option<u32>,
     /// `owner/name` of the `origin` remote when it is on GitHub; Issues are read from it.
     pub github: Option<String>,
+    /// The changed files by name, the most changed lines first, at most `MAX_FILES`.
+    pub files: Vec<FileChange>,
+}
+
+/// Files kept per repo: enough for Home's big tile, few enough that a stray untracked folder
+/// never floods the window.
+const MAX_FILES: usize = 50;
+
+/// A changed file by name and line counts – never its contents (AGENTS.md § Privacy contract).
+/// Untracked and binary files have no line counts.
+#[derive(Serialize, Clone, PartialEq, Eq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FileChange {
+    pub path: String,
+    pub insertions: Option<u32>,
+    pub deletions: Option<u32>,
 }
 
 /// Untracked files count in `Repo::changed` but not here: counting their lines would mean
@@ -52,8 +68,11 @@ pub fn read(cwd: &Path) -> Option<RepoRead> {
     // A repo with no commit yet has a branch but no log, and it is still a repo.
     let (head_at, head_subject) = git(cwd, &["log", "-1", "--format=%cI%n%s"]).and_then(|o| parse_log(&o)).unzip();
     // `-uall` lists each file of an untracked folder, which plain `--porcelain` folds into one line.
-    let changed = git(cwd, &["status", "--porcelain", "-uall"]).map(|o| parse_status(&o)).unwrap_or(0);
+    let status = git(cwd, &["status", "--porcelain", "-uall"]).unwrap_or_default();
+    let changed = parse_status(&status);
     let diff = head_at.as_ref().and_then(|_| git(cwd, &["diff", "HEAD", "--shortstat"])).map(|o| parse_shortstat(&o));
+    let numstat = head_at.as_ref().and_then(|_| git(cwd, &["diff", "HEAD", "--numstat"])).unwrap_or_default();
+    let files = files(&status, &numstat);
     // A branch that was never pushed has no upstream, and all of its commits are still unpushed.
     let has_remote = git(cwd, &["remote"]).is_some_and(|o| !o.trim().is_empty());
     let unpushed = git(cwd, &["rev-list", "--count", "@{u}..HEAD"])
@@ -64,7 +83,7 @@ pub fn read(cwd: &Path) -> Option<RepoRead> {
     let commit_days = git(cwd, &["log", "--branches", "--since=30 days ago", "--date=format-local:%Y-%m-%d", "--format=%cd"])
         .map(|o| o.lines().map(str::trim).filter(|l| !l.is_empty()).map(str::to_owned).collect())
         .unwrap_or_default();
-    Some(RepoRead { repo: Repo { branch, head_at, head_subject, changed, diff, unpushed, github }, last_commit_at, commit_days })
+    Some(RepoRead { repo: Repo { branch, head_at, head_subject, changed, diff, unpushed, github, files }, last_commit_at, commit_days })
 }
 
 /// Stdout of a git command in `cwd`, `None` when git fails (not a repo, no upstream…).
@@ -85,6 +104,48 @@ fn parse_log(out: &str) -> Option<(String, String)> {
 /// One line per changed file in `--porcelain`.
 fn parse_status(out: &str) -> u32 {
     out.lines().filter(|l| !l.trim().is_empty()).count() as u32
+}
+
+/// git quotes a path holding a space or an unusual character; the quotes go, the rest is kept.
+fn unquote(path: &str) -> String {
+    path.strip_prefix('"').and_then(|p| p.strip_suffix('"')).unwrap_or(path).to_owned()
+}
+
+/// The path of each line of `--porcelain`: after the two status letters and a space, and after
+/// ` -> ` for a rename, which keeps its new path.
+fn parse_status_paths(out: &str) -> Vec<String> {
+    out.lines()
+        .filter_map(|l| l.get(3..))
+        .map(|p| unquote(p.rsplit_once(" -> ").map_or(p, |(_, new)| new)))
+        .collect()
+}
+
+/// `--numstat`: insertions, deletions and path, tab-separated; a binary file has `-` for both.
+fn parse_numstat(out: &str) -> HashMap<String, (Option<u32>, Option<u32>)> {
+    out.lines()
+        .filter_map(|l| {
+            let mut parts = l.splitn(3, '\t');
+            let (ins, del, path) = (parts.next()?, parts.next()?, parts.next()?);
+            Some((unquote(path), (ins.parse().ok(), del.parse().ok())))
+        })
+        .collect()
+}
+
+/// The changed files with their line counts, the most changed first, at most `MAX_FILES`.
+fn files(status: &str, numstat: &str) -> Vec<FileChange> {
+    let lines = parse_numstat(numstat);
+    let mut files: Vec<FileChange> = parse_status_paths(status)
+        .into_iter()
+        .map(|path| {
+            let (insertions, deletions) = lines.get(&path).copied().unwrap_or((None, None));
+            FileChange { path, insertions, deletions }
+        })
+        .collect();
+    let size = |f: &FileChange| f.insertions.unwrap_or(0) + f.deletions.unwrap_or(0);
+    // A stable sort keeps git's order among files of the same size.
+    files.sort_by_key(|f| std::cmp::Reverse(size(f)));
+    files.truncate(MAX_FILES);
+    files
 }
 
 /// ` 3 files changed, 10 insertions(+), 2 deletions(-)`, where either count is left out at zero
@@ -134,6 +195,31 @@ mod tests {
         assert_eq!(parse_shortstat(" 1 file changed, 1 insertion(+)\n"), DiffStat { insertions: 1, deletions: 0 });
         assert_eq!(parse_shortstat(" 1 file changed, 4 deletions(-)\n"), DiffStat { insertions: 0, deletions: 4 });
         assert_eq!(parse_shortstat(""), DiffStat::default());
+    }
+
+    #[test]
+    fn status_gives_each_changed_path_a_rename_its_new_one() {
+        let out = " M src/a.ts\n?? docs/review/full.md\nR  old.rs -> src/new.rs\n?? \"with space.md\"\n";
+        assert_eq!(parse_status_paths(out), vec!["src/a.ts", "docs/review/full.md", "src/new.rs", "with space.md"]);
+        assert!(parse_status_paths("").is_empty());
+    }
+
+    #[test]
+    fn numstat_gives_lines_per_path_and_none_for_a_binary() {
+        let lines = parse_numstat("10\t2\tsrc/a.ts\n-\t-\tart/icon.png\n");
+        assert_eq!(lines["src/a.ts"], (Some(10), Some(2)));
+        assert_eq!(lines["art/icon.png"], (None, None));
+        assert!(parse_numstat("").is_empty());
+    }
+
+    #[test]
+    fn files_put_the_most_changed_first_and_keep_fifty() {
+        let status: String = (0..60).map(|i| format!("?? f{i}.txt\n")).collect::<String>() + " M src/a.ts\n M src/b.ts\n";
+        let files = files(&status, "3\t1\tsrc/a.ts\n40\t0\tsrc/b.ts\n");
+        assert_eq!(files.len(), 50);
+        assert_eq!(files[0], FileChange { path: "src/b.ts".into(), insertions: Some(40), deletions: Some(0) });
+        assert_eq!(files[1].path, "src/a.ts");
+        assert_eq!(files[2].insertions, None);
     }
 
     #[test]

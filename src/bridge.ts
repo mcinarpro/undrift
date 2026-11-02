@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import type { NavUser } from "@/types";
+import type { NavUser, Project } from "@/types";
 
 // The window's only door to the Rust bridge (src-tauri/src/lib.rs commands, bridge/mod.rs events).
 // In a plain browser there is no bridge: a sample user stands in and the window actions do nothing.
@@ -31,6 +31,24 @@ export async function watchUser(onUser: (user: NavUser, avatar: string | null) =
   const cached = await invoke<NavUser | null>("nav_user");
   if (cached) onUser(cached, await avatar());
 }
+
+/** Calls `onProjects` with the bridge's list once it has one, then on every change. In a plain
+ * browser the list is empty, so Home shows its Empty State. */
+export async function watchProjects(onProjects: (projects: Project[]) => void): Promise<void> {
+  if (!inTauri) {
+    onProjects([]);
+    return;
+  }
+  await listen<Project[]>("projects", (e) => onProjects(e.payload));
+  const now = await invoke<Project[] | null>("projects_now");
+  if (now) onProjects(now);
+}
+
+// The bridge checks the Project, Session and Issue against its own list before opening anything.
+export const resume = (path: string, id: string) => (inTauri ? invoke<void>("resume", { path, id }) : Promise.resolve());
+export const start = (path: string, number: number) => (inTauri ? invoke<void>("start", { path, number }) : Promise.resolve());
+export const letGo = (path: string) => (inTauri ? invoke<void>("let_go", { path }) : Promise.resolve());
+export const undoLetGo = (path: string) => (inTauri ? invoke<void>("undo_let_go", { path }) : Promise.resolve());
 
 export const quit = () => (inTauri ? invoke<void>("quit") : Promise.resolve());
 

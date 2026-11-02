@@ -7,6 +7,7 @@ pub mod config;
 mod gh;
 pub mod history;
 pub mod issues;
+pub mod let_go;
 pub mod repo;
 pub mod sessions;
 pub mod transcripts;
@@ -113,14 +114,19 @@ pub struct Project {
     pub sessions: Vec<SessionView>,
     /// Open Issues of its GitHub repository; empty without one.
     pub issues: Vec<Issue>,
+    /// Whether Home lists it (GLOSSARY.md § Loose End), Let Go already applied.
+    pub loose_end: bool,
 }
 
 /// Latest list, shared with the commands.
 #[derive(Default)]
 pub struct Latest {
-    pub projects: Vec<Project>,
+    /// `None` until the first list is built, so the window can tell "not read yet" from "nothing".
+    pub projects: Option<Vec<Project>>,
     /// Set by the `rescan` command; the next tick rescans everything.
     pub rescan: bool,
+    /// Set by the `let_go` command; the next tick rereads the Let Gos and sends the list again.
+    pub rebuild: bool,
 }
 pub type Shared = Arc<Mutex<Latest>>;
 
@@ -182,6 +188,7 @@ struct Known {
     live: Vec<Session>,
     /// Open Issues by `owner/name`.
     issues: HashMap<String, Vec<Issue>>,
+    let_go: let_go::LetGo,
 }
 
 impl Known {
@@ -235,6 +242,9 @@ impl Known {
                 let last_commit = read.and_then(|r| r.last_commit_at.as_deref());
                 let last_activity = latest(last_commit.into_iter().chain(records.first().map(|r| r.meta.last_activity.as_str())));
                 let issues = read.and_then(|r| r.repo.github.as_ref()).and_then(|g| self.issues.get(g)).cloned().unwrap_or_default();
+                let path_text = path.to_string_lossy().into_owned();
+                let last_session = records.first().map(|r| r.meta.last_activity.as_str());
+                let loose_end = loose_end(read, last_session, last_activity.as_deref(), self.let_go.get(&path_text).map(String::as_str));
                 Project {
                     short_path: config::short(&path),
                     name: path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.display().to_string()),
@@ -246,7 +256,8 @@ impl Known {
                     open_sessions: open.iter().map(|s| open_view(s)).collect(),
                     sessions: records.iter().take(MAX_SESSIONS).map(|r| view(r.cwd.clone(), &r.meta)).collect(),
                     issues,
-                    path: path.to_string_lossy().into_owned(),
+                    loose_end,
+                    path: path_text,
                 }
             })
             .collect()
@@ -283,6 +294,28 @@ fn latest<'a>(ts: impl Iterator<Item = &'a str>) -> Option<String> {
         .map(|(_, t)| t.to_owned())
 }
 
+fn instant(t: &str) -> Option<DateTime<FixedOffset>> {
+    DateTime::parse_from_rfc3339(t).ok()
+}
+
+/// GLOSSARY.md § Loose End: a git repository holding work not committed or not pushed, whose last
+/// Session is more recent than its last commit – and not let go of since its last Activity
+/// (§ Let Go). Timestamps are compared as instants, since they are written with different offsets.
+fn loose_end(read: Option<&RepoRead>, last_session: Option<&str>, last_activity: Option<&str>, let_go: Option<&str>) -> bool {
+    let Some(read) = read else { return false };
+    let Some(session) = last_session.and_then(instant) else { return false };
+    let left_work = read.repo.changed > 0 || read.repo.unpushed.is_some_and(|n| n > 0);
+    // A repo with no commit yet has nothing to be more recent than.
+    let after_commit = read.last_commit_at.as_deref().and_then(instant).is_none_or(|c| session > c);
+    left_work && after_commit && !let_go.is_some_and(|g| let_go_holds(g, last_activity))
+}
+
+/// A Let Go holds while no Activity came after it; one that cannot be read never hides anything.
+fn let_go_holds(let_go: &str, last_activity: Option<&str>) -> bool {
+    let Some(g) = instant(let_go) else { return false };
+    last_activity.and_then(instant).is_none_or(|a| a <= g)
+}
+
 pub fn start(app: AppHandle) {
     let shared: Shared = Arc::default();
     app.manage(shared.clone());
@@ -301,7 +334,7 @@ pub fn start(app: AppHandle) {
 
 fn run(app: AppHandle, shared: Shared) {
     let mut settings = Settings::new();
-    let mut known = Known { discovered: config::discover(settings.config()), ..Default::default() };
+    let mut known = Known { discovered: config::discover(settings.config()), let_go: let_go::read(), ..Default::default() };
     let mut history_scan: Background<Vec<Record>> = Background::new();
     let mut repo_scan: Background<HashMap<PathBuf, RepoRead>> = Background::new();
     let mut issue_scan: Background<HashMap<String, Vec<Issue>>> = Background::new();
@@ -316,8 +349,11 @@ fn run(app: AppHandle, shared: Shared) {
         // A Session that starts or finishes a turn changes its Project's Status, so the list goes out again.
         let live_changed = live != known.live;
         known.live = live;
-        let asked = shared.lock().map(|mut l| std::mem::take(&mut l.rescan)).unwrap_or(false);
-        let mut dirty = live_changed || config_changed;
+        let (asked, rebuild) = shared.lock().map(|mut l| (std::mem::take(&mut l.rescan), std::mem::take(&mut l.rebuild))).unwrap_or_default();
+        if rebuild {
+            known.let_go = let_go::read();
+        }
+        let mut dirty = live_changed || config_changed || rebuild;
         let mut answer = false;
 
         // A Session that opens or closes has a new title or last prompt, so the transcripts are reread.
@@ -363,9 +399,9 @@ fn run(app: AppHandle, shared: Shared) {
             let changed = shared
                 .lock()
                 .map(|mut l| {
-                    let changed = answer || l.projects != list;
+                    let changed = answer || l.projects.as_ref() != Some(&list);
                     if changed {
-                        l.projects = list.clone();
+                        l.projects = Some(list.clone());
                     }
                     changed
                 })
@@ -391,5 +427,53 @@ mod tests {
         let b = "2026-10-30T22:45:00Z";
         assert_eq!(latest([a, b].into_iter()).as_deref(), Some(b));
         assert_eq!(latest([].into_iter()), None);
+    }
+
+    fn read(changed: u32, unpushed: Option<u32>, last_commit_at: Option<&str>) -> RepoRead {
+        RepoRead { repo: Repo { changed, unpushed, ..Default::default() }, last_commit_at: last_commit_at.map(str::to_owned), ..Default::default() }
+    }
+
+    const COMMIT: &str = "2026-11-01T18:00:00+01:00";
+    const LATER: &str = "2026-11-01T23:10:00+01:00";
+
+    #[test]
+    fn a_session_after_the_last_commit_that_left_changes_is_a_loose_end() {
+        assert!(loose_end(Some(&read(3, Some(0), Some(COMMIT))), Some(LATER), Some(LATER), None));
+    }
+
+    #[test]
+    fn a_clean_and_pushed_repo_is_not_a_loose_end() {
+        assert!(!loose_end(Some(&read(0, Some(0), Some(COMMIT))), Some(LATER), Some(LATER), None));
+        assert!(!loose_end(Some(&read(0, None, Some(COMMIT))), Some(LATER), Some(LATER), None));
+    }
+
+    #[test]
+    fn commits_not_yet_pushed_are_work_left_behind() {
+        assert!(loose_end(Some(&read(0, Some(2), Some(COMMIT))), Some(LATER), Some(LATER), None));
+    }
+
+    #[test]
+    fn a_commit_after_the_last_session_closes_it() {
+        // 23:00 UTC is after the session's 22:10 UTC, though its text sorts before it.
+        assert!(!loose_end(Some(&read(3, Some(0), Some("2026-11-01T23:00:00Z"))), Some(LATER), Some(LATER), None));
+    }
+
+    #[test]
+    fn a_repo_with_no_commit_yet_is_one_once_a_session_ran() {
+        assert!(loose_end(Some(&read(3, None, None)), Some(LATER), Some(LATER), None));
+        assert!(!loose_end(Some(&read(3, None, None)), None, None, None));
+    }
+
+    #[test]
+    fn a_folder_that_is_not_a_repo_never_is() {
+        assert!(!loose_end(None, Some(LATER), Some(LATER), None));
+    }
+
+    #[test]
+    fn let_go_lasts_until_the_next_activity() {
+        let r = read(3, Some(0), Some(COMMIT));
+        let after = "2026-11-02T06:00:00+01:00";
+        assert!(!loose_end(Some(&r), Some(LATER), Some(LATER), Some(after)));
+        assert!(loose_end(Some(&r), Some("2026-11-02T07:00:00+01:00"), Some("2026-11-02T07:00:00+01:00"), Some(after)));
     }
 }

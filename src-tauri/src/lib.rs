@@ -1,13 +1,65 @@
 mod bridge;
+mod terminal;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, WindowEvent};
 
-/// Latest list, so the window has something to show before the first event.
+/// Latest list, so the window has something to show before the first event; `None` until the
+/// bridge built its first one.
 #[tauri::command]
-async fn projects_now(shared: tauri::State<'_, bridge::Shared>) -> Result<Vec<bridge::Project>, ()> {
-    Ok(shared.lock().map(|l| l.projects.clone()).unwrap_or_default())
+async fn projects_now(shared: tauri::State<'_, bridge::Shared>) -> Result<Option<Vec<bridge::Project>>, ()> {
+    Ok(shared.lock().ok().and_then(|l| l.projects.clone()))
+}
+
+/// The Project the window names, from the bridge's own list: the window never chooses the folder
+/// a terminal opens in.
+fn project(shared: &bridge::Shared, path: &str) -> Result<bridge::Project, String> {
+    let latest = shared.lock().map_err(|_| "bridge state is poisoned")?;
+    latest.projects.iter().flatten().find(|p| p.path == path).cloned().ok_or_else(|| format!("not a Project: {path}"))
+}
+
+/// Resume: a terminal in the Session's folder running `claude --resume <id>`.
+#[tauri::command]
+async fn resume(shared: tauri::State<'_, bridge::Shared>, path: String, id: String) -> Result<(), String> {
+    let project = project(&shared, &path)?;
+    let session = project.sessions.iter().find(|s| s.id == id).ok_or("not a Session of this Project")?;
+    terminal::resume(&session.cwd, &session.id)
+}
+
+/// Start: a terminal in the Project's folder running `claude` with the Issue as its first prompt.
+#[tauri::command]
+async fn start(shared: tauri::State<'_, bridge::Shared>, path: String, number: u32) -> Result<(), String> {
+    let project = project(&shared, &path)?;
+    if !project.issues.iter().any(|i| i.number == number) {
+        return Err(format!("not an open Issue of {path}: #{number}"));
+    }
+    terminal::start(&project.path, number)
+}
+
+/// Let Go: takes the Loose End off Home until the Project's next Activity. The next tick rereads
+/// the Let Gos and sends the list again.
+#[tauri::command]
+async fn let_go(shared: tauri::State<'_, bridge::Shared>, path: String) -> Result<(), String> {
+    let project = project(&shared, &path)?;
+    bridge::let_go::stamp(&project.path, &chrono::Local::now().to_rfc3339()).map_err(|e| e.to_string())?;
+    rebuild(&shared);
+    Ok(())
+}
+
+/// The toast's Undo after a Let Go: the Loose End is back on Home on the next tick.
+#[tauri::command]
+async fn undo_let_go(shared: tauri::State<'_, bridge::Shared>, path: String) -> Result<(), String> {
+    let project = project(&shared, &path)?;
+    bridge::let_go::undo(&project.path).map_err(|e| e.to_string())?;
+    rebuild(&shared);
+    Ok(())
+}
+
+fn rebuild(shared: &bridge::Shared) {
+    if let Ok(mut l) = shared.lock() {
+        l.rebuild = true;
+    }
 }
 
 /// Ask the bridge to rescan transcripts, repos and Issues on its next tick; it answers with a
@@ -43,7 +95,7 @@ fn quit(app: AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![projects_now, rescan, nav_user, nav_user_avatar, quit])
+        .invoke_handler(tauri::generate_handler![projects_now, resume, start, let_go, undo_let_go, rescan, nav_user, nav_user_avatar, quit])
         .setup(|app| {
             bridge::start(app.handle().clone());
             tray(app)?;

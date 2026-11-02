@@ -24,12 +24,28 @@ is described here once it is built; until then this section holds what was decid
 - **Find** (`F` or `Ctrl K`): Geist's Command Menu over Projects, the last Sessions (Enter
   resumes), the pages and the actions.
 - **Home**, the first page (ADR 0001): the Loose Ends in three sections – Last Night (since 18:00 the
-  day before), This Week, Older – newest first, the biggest diff first within a section. Each shows
-  its Project and Area, the last Session's title and last prompt, files changed with +/−, the
-  branch, how long ago it was left and the Status of its Session when one is open. Resume is the primary
-  action, Let Go sits in a `⋯` menu. Under them, the Issues ready to Start, each with Start. With none, Geist's Empty State says
-  *Nothing left half-done.* above the five Projects touched last, each with Resume. The layout is
-  being chosen on the `prototype/home` branch of `undrift-old`.
+  day before), This Week, Older – newest first; within a section a busy or waiting Session first, then the biggest diff. Each shows
+  its Project and Area, the last Session's title and last prompt, files changed with +/− (left out
+  when no tracked line changed), the branch unless it is `main` or `master`, how long ago it was left
+  and the Status of its Session when one is open. Each section is a grid of `material-small` cards,
+  12 px, two across and three from a 1536 px window, filling the width. A card leads with what the
+  Session was doing – its title in `type-heading-16`, the last prompt under it in `type-copy-14`, two
+  lines each – then the Project's Drift strip with its active days, framed by the Project above and
+  the numbers below. A Session at work or waiting on you must not slip by: its card comes first in its
+  section and says *Busy* in a blue subtle Badge or *Waiting* on `alpha-200`; a quiet one keeps the
+  dot and the word. Let Go sits in a `⋯` menu.
+  Above the sections, a bento band of four columns says what matters by size: the first Loose End
+  leaves its section for a 2×2 tile – its section and age, the Session title in `type-heading-24`,
+  three lines of prompt, the Drift strip, its five most changed files (mono path, `+n −n` or *new*),
+  how many more and the last commit's subject, then the page's only primary Resume, the diff stat and
+  its Issue count. Four 1×1 figure tiles sit beside it – Loose Ends, Lines Not Committed, Commits Not
+  Pushed, Sessions Open – each a `type-heading-32` number over its label, then where it comes from:
+  ranked 6 px bars in `accent`, one hue, largest first, each named and counted beside it, the tail
+  past four folded into Other; Sessions Open lists the Projects with their Status instead. The other cards take a
+  secondary Resume. Under them, Ready to Start: a card per Project – its Issues newest first, each `#N`,
+  title and a tertiary Start on a row that takes `alpha-100` on hover – three per card until Show All, the Projects ordered by their newest
+  Issue. With no Loose End, Geist's Empty State says *Nothing left half-done.* above the five
+  Projects touched last, each with Resume.
 - **Projects**: every Project as Vercel's project card, filtered by Area – avatar, name, path,
   status dot, last commit, branch · relative time · uncommitted, and the Drift strip.
 - **Project page**, shaped like Vercel's Project Overview: a **Where You Left Off** card – the Drift
@@ -77,7 +93,7 @@ backgrounds = `raised`, `muted-foreground` = `muted`, `border` = `line`, `ring` 
 | `drifting` | `#ffb224` | `#ffb224` | amber-700 · the Drifting dot, the Drifting Badge's tint |
 | `drifting-text` | `#a35200` | `#f2a20d` | amber-900 · the Drifting Badge's word – 5.1 / 7.3:1 on its tint |
 | `parked` | `#a8a8a8` | `#878787` | gray-600 · the Parked dot |
-| `area-purple` · `area-green` · `area-pink` · `area-teal` · `area-gray` | `#8e4ec6` · `#30a46c` · `#d6409f` · `#12a594` · `#8d8d8d` | same | Radix step 9 · the Area colours, never blue or amber: the Area's swatch and its hub in the Graph |
+| `area-purple` · `area-green` · `area-pink` · `area-teal` · `area-gray` | `#8e4ec6` · `#30a46c` · `#d6409f` · `#12a594` · `#8d8d8d` | same | Radix step 9 · the Area colours, never blue or amber: the Area's swatch, its hub in the Graph, and an 18% tint mixed into `surface` behind its Projects' avatars |
 | `alpha-100` … `alpha-600` | `#0000000d` … `#00000057` | `#ffffff0f` … `#ffffff82` | gray-alpha 100, 200, 400, 500, 600 · 100 hover, 200 selected, 400 a field's or a key's edge and the gauge track, 500 a hovered field's edge – the same on any surface |
 | `error-text` | `#cb2a2f` | `#ff6166` | red-900 · error text (`text-error`) – 5.4 / 6.7:1 |
 | `error-fill` | `#da2f35` | `#d93036` | red-800 · the hovered Close; white on it 4.7:1 |
@@ -166,7 +182,7 @@ the information.
   Geist's other materials, each starting with the same edge.
 - Radius, fixed steps rather than multiples of `--radius`: 4 px `rounded-sm` · 6 px `rounded-md` for
   buttons, rows, sidebar links, Project avatars, and the Project cards and list cards (the Projects grid), as on Vercel's dashboard · 8 px `rounded-lg` · 12 px `rounded-xl` for
-  Panels, the Project page's cards, dialogs and menus · 2 px for strip cells · full for dots and
+  Panels, the Project page's cards, Home's cards, dialogs and menus · 2 px for strip cells · full for dots and
   the NavUser's avatar, a person rather than a Project, as on Vercel.
 - Spacing on the 4 px grid. Separation by space and surface, not divider lines.
 - Overlays move as Geist's: Find scales in from 96% over 300 ms on Geist's swift curve,

@@ -32,6 +32,14 @@ export type DiffStat = {
   deletions: number;
 };
 
+/** A changed file by name and line counts, never its contents. Untracked and binary files have
+ * no line counts. */
+export type FileChange = {
+  path: string;
+  insertions: number | null;
+  deletions: number | null;
+};
+
 export type Repo = {
   branch: string;
   headAt: string | null;
@@ -44,6 +52,8 @@ export type Repo = {
   unpushed: number | null;
   /** `owner/name` of the `origin` remote when it is on GitHub. */
   github: string | null;
+  /** The changed files, the most changed lines first, at most 50. */
+  files: FileChange[];
 };
 
 /** An open Issue of a Project's GitHub repository. */
@@ -85,6 +95,8 @@ export type Project = {
   sessions: Session[];
   /** Open Issues; empty when the Project has no GitHub remote. */
   issues: Issue[];
+  /** Whether Home lists it as a Loose End, Let Go already applied. */
+  looseEnd: boolean;
 };
 
 /** The GitHub account `gh` is signed in to, shown at the foot of the sidebar. */
