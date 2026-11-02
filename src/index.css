@@ -247,6 +247,10 @@
   input:focus-visible {
     box-shadow: none;
     }
+  /* a menu row shows focus with its highlight, as in Geist's menus, not the ring */
+  [role^="menuitem"]:focus-visible {
+    box-shadow: none;
+    }
   /* DESIGN.md promises calm motion: under reduce, every animation and transition ends at once,
      the generated dialogs and menus included. !important in a layer outranks any utility. */
   @media (prefers-reduced-motion: reduce) {

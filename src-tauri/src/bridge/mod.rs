@@ -4,11 +4,13 @@
 //! the metadata lines Claude Code writes for its own resume picker.
 
 pub mod config;
+mod gh;
 pub mod history;
 pub mod issues;
 pub mod repo;
 pub mod sessions;
 pub mod transcripts;
+pub mod user;
 
 use chrono::{DateTime, FixedOffset, Local};
 use config::{project_for, Config, Settings};
@@ -24,8 +26,27 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
+/// Undrift's own state folder, `~/.local/share/undrift/`; `None` without a home folder, so nothing
+/// is ever written relative to the working directory.
+pub fn data_dir() -> Option<PathBuf> {
+    dirs::data_dir().map(|d| d.join("undrift"))
+}
+
+/// Write through a temporary file and a rename, so a crash never leaves half a file behind
+/// (AGENTS.md § Privacy contract).
+pub fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let tmp = path.with_extension("tmp");
+    std::fs::write(&tmp, bytes)?;
+    std::fs::rename(&tmp, path)
+}
+
 /// Full `Vec<Project>`, emitted whenever anything in it changes.
 pub const PROJECTS_EVENT: &str = "projects";
+/// The NavUser, emitted once `gh api user` answered at start.
+pub const USER_EVENT: &str = "user";
 /// The loop ticks every second; the scans below run every so many ticks, and sooner when a
 /// Session opens or closes, the config changes or the window asks.
 const HISTORY_EVERY_TICKS: u32 = 600;
@@ -265,6 +286,16 @@ fn latest<'a>(ts: impl Iterator<Item = &'a str>) -> Option<String> {
 pub fn start(app: AppHandle) {
     let shared: Shared = Arc::default();
     app.manage(shared.clone());
+    // The NavUser has a thread of its own: `gh api user` and the avatar go over the network, and
+    // the Project list must not wait for them.
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        if let Some(user) = user::refresh() {
+            if let Err(e) = handle.emit(USER_EVENT, &user) {
+                eprintln!("bridge: emit failed: {e}");
+            }
+        }
+    });
     std::thread::spawn(move || run(app, shared));
 }
 

@@ -165,8 +165,9 @@ the information.
   card draws the double ring itself. `--ud-shadow-medium`, `--ud-shadow-menu` and `--ud-shadow-modal` are
   Geist's other materials, each starting with the same edge.
 - Radius, fixed steps rather than multiples of `--radius`: 4 px `rounded-sm` · 6 px `rounded-md` for
-  buttons, rows, sidebar links, avatars, and the Project cards and list cards (the Projects grid), as on Vercel's dashboard · 8 px `rounded-lg` · 12 px `rounded-xl` for
-  Panels, the Project page's cards, dialogs and menus · 2 px for strip cells · full for dots.
+  buttons, rows, sidebar links, Project avatars, and the Project cards and list cards (the Projects grid), as on Vercel's dashboard · 8 px `rounded-lg` · 12 px `rounded-xl` for
+  Panels, the Project page's cards, dialogs and menus · 2 px for strip cells · full for dots and
+  the NavUser's avatar, a person rather than a Project, as on Vercel.
 - Spacing on the 4 px grid. Separation by space and surface, not divider lines.
 - Overlays move as Geist's: Find scales in from 96% over 300 ms on Geist's swift curve,
   `cubic-bezier(.175,.885,.32,1.1)`, over an `overlay` backdrop at 80% with no blur – an unlayered

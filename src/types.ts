@@ -86,3 +86,11 @@ export type Project = {
   /** Open Issues; empty when the Project has no GitHub remote. */
   issues: Issue[];
 };
+
+/** The GitHub account `gh` is signed in to, shown at the foot of the sidebar. */
+export type NavUser = {
+  login: string;
+  /** The profile's name, or the login when the profile has none. */
+  name: string;
+  profileUrl: string;
+};

@@ -57,23 +57,19 @@ struct Cache {
     files: HashMap<String, FileRecord>,
 }
 
-fn cache_path() -> PathBuf {
-    dirs::data_dir().unwrap_or_default().join("undrift").join("history.json")
+fn cache_path() -> Option<PathBuf> {
+    super::data_dir().map(|d| d.join("history.json"))
 }
 
 fn load_cache() -> Cache {
-    let c: Cache = std::fs::read_to_string(cache_path()).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+    let c: Cache = cache_path().and_then(|p| std::fs::read_to_string(p).ok()).and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
     if c.version == CACHE_VERSION { c } else { Cache::default() }
 }
 
 fn save_cache(c: &Cache) {
-    let path = cache_path();
-    if let Some(dir) = path.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    let tmp = path.with_extension("json.tmp");
-    if serde_json::to_string(c).ok().and_then(|t| std::fs::write(&tmp, t).ok()).is_some() {
-        let _ = std::fs::rename(tmp, path);
+    // A cache that cannot be written only means the next scan parses again.
+    if let (Some(path), Ok(text)) = (cache_path(), serde_json::to_string(c)) {
+        let _ = super::write_atomic(&path, text.as_bytes());
     }
 }
 
