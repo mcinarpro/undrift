@@ -1,4 +1,5 @@
 import {
+  ArrowUpDown,
   Bot,
   Ellipsis,
   ExternalLink,
@@ -6,6 +7,8 @@ import {
   GitBranch,
   GitCommitHorizontal,
   House,
+  LayoutGrid,
+  List,
   LogOut,
   Minus,
   Monitor,
@@ -49,6 +52,9 @@ const ICONS = {
   zoomIn: ZoomIn,
   zoomOut: ZoomOut,
   fit: Scan,
+  grid: LayoutGrid,
+  list: List,
+  sort: ArrowUpDown,
 } as const;
 
 export type IconName = keyof typeof ICONS;

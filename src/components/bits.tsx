@@ -1,6 +1,7 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
 import { DriftStrip } from "@/components/drift-strip";
 import { Kbd } from "@/components/ui/kbd";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { age, driftCells, monogram, type StatusName } from "@/lib/home";
 import type { Group } from "@/lib/projects";
 import { cn } from "@/lib/utils";
@@ -100,18 +101,20 @@ export function Badge({ size = "md", className, children }: { size?: "md" | "sm"
   );
 }
 
-/** A Session's Status: a Badge when it is busy or waiting on you, the dot and the word when quiet. */
-export function StatusMark({ status }: { status: StatusName }) {
+/** A Session's Status: a Badge when it is busy or waiting on you, the dot and the word when quiet.
+ * Several Sessions in one Status are counted: *2 Sessions busy*. */
+export function StatusMark({ status, count = 1 }: { status: StatusName; count?: number }) {
   const dot = <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[status])} />;
+  const label = count > 1 ? `${count} Sessions ${status.toLowerCase()}` : status;
   return LIVE_BADGE[status] ? (
-    <Badge className={LIVE_BADGE[status]}>
+    <Badge className={cn(LIVE_BADGE[status], "tabular-nums")}>
       {dot}
-      {status}
+      {label}
     </Badge>
   ) : (
-    <span className="flex shrink-0 items-center gap-1.5 type-label-13 text-text-2">
+    <span className="flex shrink-0 items-center gap-1.5 type-label-13 text-text-2 tabular-nums">
       {dot}
-      {status}
+      {label}
     </span>
   );
 }
@@ -215,36 +218,61 @@ export function ProjectAvatar({ name, color, size = 32 }: { name: string; color?
 
 /** Geist's Switch (DESIGN.md § Components): native radios in a fieldset, so the group is one tab
  * stop and the arrow keys move the choice. The hidden radio hides its own focus ring, so the label
- * draws the double ring while the radio inside it has keyboard focus. */
+ * draws the double ring while the radio inside it has keyboard focus. `icons` is Geist's icon
+ * Switch: square options, each label an icon with its name for screen readers, and a `hint` that
+ * names it on hover and on focus. */
 export function Segmented<T extends string>({
   legend,
   name,
   value,
   options,
   onChange,
+  icons = false,
 }: {
   legend: string;
   name: string;
   value: T;
-  options: { value: T; label: ReactNode }[];
+  options: { value: T; label: ReactNode; hint?: string }[];
   onChange: (value: T) => void;
+  icons?: boolean;
 }) {
   return (
     <fieldset className="flex h-9 max-w-full items-center gap-0.5 overflow-x-auto rounded-md bg-card p-1 edge">
       <legend className="sr-only">{legend}</legend>
-      {options.map((o) => (
-        <label
-          key={o.value}
-          className={cn(
-            "flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-sm px-2.5 type-label-14 font-medium transition-colors duration-150 has-[:focus-visible]:shadow-[0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--ud-focus)]",
-            o.value === value ? "bg-alpha-200 text-foreground" : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <input type="radio" name={name} value={o.value} checked={o.value === value} onChange={() => onChange(o.value)} className="sr-only" />
-          {o.label}
-        </label>
-      ))}
+      {options.map((o) => {
+        const option = (
+          <label
+            className={cn(
+              "flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-sm px-2.5 type-label-14 font-medium transition-colors duration-150 has-[:focus-visible]:shadow-[0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--ud-focus)]",
+              icons && "w-7 justify-center px-0",
+              o.value === value ? "bg-alpha-200 text-foreground" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <input type="radio" name={name} value={o.value} checked={o.value === value} onChange={() => onChange(o.value)} className="sr-only" />
+            {o.label}
+          </label>
+        );
+        return o.hint ? (
+          <Hint key={o.value} label={o.hint}>
+            {option}
+          </Hint>
+        ) : (
+          <Fragment key={o.value}>{option}</Fragment>
+        );
+      })}
     </fieldset>
+  );
+}
+
+/** Geist's Tooltip (DESIGN.md § Components): names an icon-only control on hover and on focus. It
+ * adds to the control's own name for screen readers and never stands in for it. The child becomes
+ * the trigger, so it keeps its own element and props. */
+export function Hint({ label, children }: { label: string; children: ReactElement }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger render={children} />
+      <TooltipContent className="rounded-lg px-2 py-1.5 text-[13px]/[1.3] text-balance">{label}</TooltipContent>
+    </Tooltip>
   );
 }
 

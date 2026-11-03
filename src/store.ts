@@ -1,20 +1,45 @@
 import { create } from "zustand";
 import * as bridge from "@/bridge";
 import { failed, toasts } from "@/components/toast";
-import type { AreaFilter } from "@/lib/projects";
+import { SORTS, type AreaFilter, type GroupFilter, type Sort } from "@/lib/projects";
 import { savedTheme, setTheme, type ThemeChoice } from "@/lib/theme";
 import type { NavUser, Project } from "@/types";
 
 /** The pages the header leads to. */
 export type Page = "home" | "projects" | "graph" | "settings";
 
+/** How the Projects page lays its Projects out. */
+export type View = "grid" | "list";
+
+// The sort and the view are a way of reading the page, so they survive a restart as the theme
+// does; the filters answer a passing question, so they last only while the window runs.
+function saved<T extends string>(key: string, values: readonly T[], fallback: T): T {
+  try {
+    const v = localStorage.getItem(key);
+    return values.find((x) => x === v) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function save(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Storage can be unavailable; the choice still holds for this run.
+  }
+}
+
 type State = {
   page: Page;
   /** The path of the Project whose page is open; a Project page belongs to Projects, so it is
    * only shown while `page` is `projects`. */
   project: string | null;
-  /** Kept here rather than in the page, so coming back from a Project page keeps the filter. */
+  /** Kept here rather than in the page, so coming back from a Project page keeps the filters. */
   areaFilter: AreaFilter;
+  groupFilter: GroupFilter;
+  sort: Sort;
+  view: View;
   findOpen: boolean;
   theme: ThemeChoice;
   /** Null until the bridge answers, or for good when `gh` is signed out. */
@@ -26,6 +51,10 @@ type State = {
   go: (page: Page) => void;
   openProject: (path: string) => void;
   setAreaFilter: (filter: AreaFilter) => void;
+  /** The rail's choices, in either section or both; the page stays where it is. */
+  setFilters: (filters: { area?: AreaFilter; group?: GroupFilter }) => void;
+  setSort: (sort: Sort) => void;
+  setView: (view: View) => void;
   setFindOpen: (open: boolean) => void;
   setTheme: (theme: ThemeChoice) => void;
   quit: () => void;
@@ -39,6 +68,9 @@ export const useStore = create<State>((set) => ({
   page: "home",
   project: null,
   areaFilter: { kind: "all" },
+  groupFilter: { kind: "all" },
+  sort: saved("projects.sort", SORTS.map((s) => s.value), "drift"),
+  view: saved<View>("projects.view", ["grid", "list"], "grid"),
   findOpen: false,
   theme: savedTheme(),
   user: null,
@@ -46,8 +78,18 @@ export const useStore = create<State>((set) => ({
   projects: null,
   go: (page) => set({ page, project: null, findOpen: false }),
   openProject: (path) => set({ page: "projects", project: path, findOpen: false }),
-  // The breadcrumb's Area leads back to the Projects page filtered by it.
-  setAreaFilter: (areaFilter) => set({ page: "projects", project: null, areaFilter }),
+  // The breadcrumb's Area leads back to the Projects page filtered by it. The group filter goes
+  // back to All, so the Area shows whole and the Project just left is among its cards.
+  setAreaFilter: (areaFilter) => set({ page: "projects", project: null, areaFilter, groupFilter: { kind: "all" } }),
+  setFilters: ({ area, group }) => set((s) => ({ areaFilter: area ?? s.areaFilter, groupFilter: group ?? s.groupFilter })),
+  setSort: (sort) => {
+    save("projects.sort", sort);
+    set({ sort });
+  },
+  setView: (view) => {
+    save("projects.view", view);
+    set({ view });
+  },
   setFindOpen: (findOpen) => set({ findOpen }),
   setTheme: (theme) => {
     setTheme(theme);

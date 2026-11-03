@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Find } from "@/components/find";
 import { Toaster } from "@/components/toast";
 import { Header } from "@/components/topbar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { Graph } from "@/pages/graph";
 import { Home } from "@/pages/home";
 import { Placeholder } from "@/pages/placeholder";
@@ -39,25 +40,28 @@ export default function App() {
   }, [setFindOpen, quit]);
 
   return (
-    <Toaster>
-      <div className="flex h-screen flex-col overflow-hidden bg-background">
-        <Header />
-        {/* Keyed by the page, so a new page opens scrolled to its top. */}
-        <main key={project?.path ?? page} className="min-h-0 grow overflow-y-auto">
-          {page === "home" ? (
-            <Home />
-          ) : project ? (
-            <Project project={project} />
-          ) : page === "projects" ? (
-            <Projects />
-          ) : page === "graph" ? (
-            <Graph />
-          ) : (
-            <Placeholder page={page} />
-          )}
-        </main>
-        <Find />
-      </div>
-    </Toaster>
+    // One provider shares the Hints' 150 ms delay: once one is open, moving to the next shows it at once.
+    <TooltipProvider delay={150}>
+      <Toaster>
+        <div className="flex h-screen flex-col overflow-hidden bg-background">
+          <Header />
+          {/* Keyed by the page, so a new page opens scrolled to its top. */}
+          <main key={project?.path ?? page} className="min-h-0 grow overflow-y-auto">
+            {page === "home" ? (
+              <Home />
+            ) : project ? (
+              <Project project={project} />
+            ) : page === "projects" ? (
+              <Projects />
+            ) : page === "graph" ? (
+              <Graph />
+            ) : (
+              <Placeholder page={page} />
+            )}
+          </main>
+          <Find />
+        </div>
+      </Toaster>
+    </TooltipProvider>
   );
 }

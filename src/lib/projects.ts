@@ -1,5 +1,5 @@
-import { dayKey } from "@/lib/home";
-import type { OpenSession, Project, Session } from "@/types";
+import { dayKey, status, type StatusName } from "@/lib/home";
+import type { OpenSession, Project, Repo, Session } from "@/types";
 
 // What the Projects page, a Project page and the Graph show, worked out from the bridge's Projects
 // on the window's own clock (GLOSSARY.md § Group, § Drift, § Focus).
@@ -68,23 +68,69 @@ export function matches(p: Project, f: AreaFilter): boolean {
 export type FilterOption = { filter: AreaFilter; label: string; color?: string; count: number };
 
 /** All, then every Area that holds a Project in its rank, then Unsorted when a Project has no Area:
- * an Area exists only while it holds a Project (GLOSSARY.md § Area), so none is ever empty. */
-export function areaFilters(projects: Project[]): FilterOption[] {
-  const areas = new Map<string, { rank: number; color: string; count: number }>();
-  for (const p of projects) {
-    if (!p.area) continue;
-    const a = areas.get(p.area.name) ?? { rank: p.area.rank, color: p.area.color, count: 0 };
-    a.count += 1;
-    areas.set(p.area.name, a);
-  }
-  const unsorted = projects.filter((p) => !p.area).length;
+ * an Area exists only while it holds a Project (GLOSSARY.md § Area), so none is ever empty. The
+ * choices come from every Project, so the rail keeps its rows while the group filter changes; each
+ * count covers only the Projects `within` keeps, so it says what choosing it would show. */
+export function areaFilters(projects: Project[], within: (p: Project) => boolean = () => true): FilterOption[] {
+  const areas = new Map<string, { rank: number; color: string }>();
+  for (const p of projects) if (p.area && !areas.has(p.area.name)) areas.set(p.area.name, { rank: p.area.rank, color: p.area.color });
+  const kept = projects.filter(within);
+  const count = (f: AreaFilter) => kept.filter((p) => matches(p, f)).length;
+  const unsorted: AreaFilter = { kind: "unsorted" };
   return [
-    { filter: { kind: "all" }, label: "All", count: projects.length },
+    { filter: { kind: "all" }, label: "All", count: kept.length },
     ...[...areas.entries()]
       .sort((a, b) => a[1].rank - b[1].rank)
-      .map(([name, a]): FilterOption => ({ filter: { kind: "area", name }, label: name, color: a.color, count: a.count })),
-    ...(unsorted > 0 ? [{ filter: { kind: "unsorted" }, label: "Unsorted", count: unsorted } as FilterOption] : []),
+      .map(([name, a]): FilterOption => ({ filter: { kind: "area", name }, label: name, color: a.color, count: count({ kind: "area", name }) })),
+    ...(projects.some((p) => !p.area) ? [{ filter: unsorted, label: "Unsorted", count: count(unsorted) }] : []),
   ];
+}
+
+/** The rail's first section: every Project, one group, the Loose Ends or the Focus – what a
+ * Project is doing, beside the Area it is filed under. */
+export type GroupFilter = { kind: "all" } | { kind: "group"; group: Group } | { kind: "looseEnds" } | { kind: "focus" };
+
+/** A filter as a key to compare and store it by. */
+export const groupKey = (f: GroupFilter) => (f.kind === "group" ? `group:${f.group}` : f.kind);
+
+export function inGroup(p: Project, f: GroupFilter, now: Date): boolean {
+  if (f.kind === "all") return true;
+  if (f.kind === "group") return group(p, now) === f.group;
+  if (f.kind === "looseEnds") return p.looseEnd;
+  return p.focusSince !== null;
+}
+
+export type GroupOption = { filter: GroupFilter; label: string; count: number };
+
+const GROUPS: Group[] = ["In Motion", "Drifting", "Parked"];
+
+/** The three groups, then the Loose Ends and the Focus. They are always listed, an empty one at 0,
+ * since a group that holds nothing is news; each count covers the Projects `within` keeps. */
+export function groupFilters(projects: Project[], now: Date, within: (p: Project) => boolean): GroupOption[] {
+  const kept = projects.filter(within);
+  const option = (filter: GroupFilter, label: string): GroupOption => ({ filter, label, count: kept.filter((p) => inGroup(p, filter, now)).length });
+  return [
+    ...GROUPS.map((g) => option({ kind: "group", group: g }, g)),
+    option({ kind: "looseEnds" }, "Loose Ends"),
+    option({ kind: "focus" }, "Focus"),
+  ];
+}
+
+/** How the Projects page orders its Projects. */
+export type Sort = "drift" | "activity" | "name";
+
+export const SORTS: { value: Sort; label: string }[] = [
+  { value: "drift", label: "Drift" },
+  { value: "activity", label: "Last Activity" },
+  { value: "name", label: "Name" },
+];
+
+/** Drift is GLOSSARY.md's order; Last Activity the latest first, a Project without any last; Name
+ * as a person reads it, so "app10" follows "app9". */
+export function sorted(projects: Project[], sort: Sort, now: Date): Project[] {
+  if (sort === "drift") return ordered(projects, now);
+  if (sort === "activity") return [...projects].sort((a, b) => time(b.lastActivity) - time(a.lastActivity));
+  return [...projects].sort((a, b) => a.name.localeCompare(b.name, "en", { numeric: true, sensitivity: "base" }));
 }
 
 /** GLOSSARY.md § Focus: the days since the Project was put in Focus, today included, and how many
@@ -96,6 +142,22 @@ export function focusDrift(p: Project, now: Date): { days: number; active: numbe
   const days = Math.min(Math.max(since, 1), 30);
   const from = dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - (days - 1)));
   return { days, active: p.activeDays.filter((d) => d >= from).length, capped: since > 30 };
+}
+
+const STATUSES: StatusName[] = ["Busy", "Waiting", "Quiet"];
+
+/** The Project's open Sessions counted by Status, the ones at work or waiting on you first. */
+export function openStatuses(p: Project, now: Date): { status: StatusName; count: number }[] {
+  return STATUSES.map((s) => ({ status: s, count: p.openSessions.filter((o) => status(o, now) === s).length })).filter((s) => s.count > 0);
+}
+
+/** The work not committed in one short value: `+n −n`, or the files changed when no tracked line
+ * did – an untracked or a binary file has no line count – and null when nothing changed. */
+export function changes(repo: Repo | null): string | null {
+  if (!repo || repo.changed === 0) return null;
+  const d = repo.diff;
+  if (d && d.insertions + d.deletions > 0) return `+${d.insertions} −${d.deletions}`;
+  return `${repo.changed} ${repo.changed === 1 ? "file" : "files"}`;
 }
 
 /** The Session the Project was left in, and its process when it still runs. */

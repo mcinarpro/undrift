@@ -49,12 +49,26 @@ window. A view is described here once it is built; until then this section holds
   title and a tertiary Start on a row that takes `alpha-100` on hover – three per card until Show All, the Projects ordered by their newest
   Issue. With no Loose End, Geist's Empty State says *Nothing left half-done.* above the five
   Projects touched last, each with Resume.
-- **Projects**: every Project as Vercel's project card, filtered by Area – avatar, name, path,
-  the Focus marker, the group dot, last commit, branch · relative time · uncommitted, and the Drift
-  strip. The filter is a Segmented control – All, each Area in its rank, Unsorted – each with its
-  count, shown once there is more than one choice; it is kept while a Project page is open. Cards
-  are 6 px, two across, three from 1280 px, four from 1536 px, the Drifting first (GLOSSARY.md
-  § Drifting), then In Motion and Parked. A card opens its Project page.
+- **Projects**: the page's own rail of filters on the left, then every Project as Vercel's project
+  card or as a row. The **rail** (§ Components) holds Groups – All, then In Motion, Drifting,
+  Parked, each with its dot, then Loose Ends and Focus – then Areas, each with its swatch in its
+  rank, then Unsorted. One choice per section, and the two combine (*Drifting* in *Mobile*); All
+  clears both. Each count says what choosing it would show, so it counts within the other
+  section's choice. The choices are kept while a Project page is open. A group's row stays at 0,
+  and choosing it shows an Empty State that says so (*No Project in Mobile is in Focus.*) with Show
+  All; an Area that no Project holds any more leaves the rail, and its choice falls back to All.
+  The page header holds the title and *n Projects* with the order in words, and on the
+  right **Sort** – a secondary small button naming the order, opening Drift (the Drifting first,
+  GLOSSARY.md § Drifting, then In Motion and Parked), Last Activity and Name – then Grid and List as
+  Geist's icon Switch, each icon named by a Hint. Both are kept across restarts, as the theme is.
+  A **card**, 6 px – avatar, name, path, the Focus marker, the Status of its open Sessions as on Home (*Busy* in the blue
+  subtle Badge, *Waiting* on `alpha-200`, counted past one: *2 Sessions busy*), the group dot and a
+  `⋯` menu (Resume the last Session, New Session, Open on GitHub, greyed when the Project cannot) –
+  then the last commit, branch · relative time · `+n −n` (the files changed when no tracked line
+  did) · open Issues, and the Drift strip. Cards are two across, three once the page beside the rail
+  is 1120 px wide, four from 1472 px, so a card keeps at least 360 px. A **row** – avatar, name and
+  path, Area, the group Badge, branch, `+n −n`, last Activity – sits on columns shared by every row
+  of one 6 px card, takes `alpha-100` on hover, and opens its Project page, as a card does.
 - **Project page**, shaped like Vercel's Project Overview: a page header – the breadcrumb, *Area /
   Project*, whose Area leads back to Projects filtered by it, above the Project's name as the
   title – then a **Where You Left Off** card – the Drift
@@ -183,7 +197,8 @@ System, Light or Dark, switched from the NavUser's menu; System follows `prefers
 - Weights 400, 500, 600 – no bold. The one exception is 550, Geist's strong inside copy.
 - Casing: headings, card and Panel titles, field labels, filter labels, buttons, menu items and
   Find's headings and actions are Title Case (*Where You Left Off*, *Needs You*, *In Motion*, *Last
-  Activity*); running text and descriptions stay sentence case. Never small uppercase.
+  Activity*); running text and descriptions stay sentence case. Small uppercase only for the
+  headings of a rail's sections (*GROUPS*, *AREAS*), which name a list rather than read as text.
 - Structure: every page has one visible `h1` – the header names no page – and its cards and
   Panels are `h2`. Labelled
   values are Geist's Description: a `<dl>` of `<dt>` / `<dd>` pairs.
@@ -260,13 +275,24 @@ The logo comes from `art/` – never redrawn, never retyped; in the interface it
 - **Segmented controls** (`Segmented` in `bits.tsx`) are Geist's Switch: a `<fieldset>` with an
   `sr-only` legend, each option a `<label>` around a hidden native radio. 36 px, `surface` inside an
   edge, 4 px padding, 28 px options with a 4 px radius; the chosen one is `alpha-200` and `text`. Labels
-  are always 500, so choosing never shifts them. `pill` is Geist's Theme Switcher: round, the chosen
-  icon on `surface` inside an edge with a soft `alpha-100` drop.
+  are always 500, so choosing never shifts them. `icons` is Geist's icon Switch: 28 px square
+  options, each an icon with its name in `sr-only` text (Grid and List on Projects). `pill` is
+  Geist's Theme Switcher: round, the chosen icon on `surface` inside an edge with a soft
+  `alpha-100` drop.
+- **Rail** (`Rail` in `projects.tsx`), a page's own filters beside its content, as on Vercel's
+  dashboard: 240 px, sticky under the header, its sections uppercase `type-label-12` `muted`
+  headings (`h2`) over 32 px rows with a 6 px radius – the dot or swatch, the label in
+  `type-label-14`, the count at the end in `type-label-13` `muted` with `tabular-nums`; a row
+  without a mark keeps its place, so the labels line up. A row is a toggle (`aria-pressed`): the
+  current one sits on `alpha-200` in `text`, as the header's tabs do, the others are `text-2` with
+  `alpha-100` under the pointer, and choosing the current one again gives its section back to All.
 - **Keys** (`Key` in `bits.tsx`) are Geist's Keyboard Input: 20 px, 12 px Geist Sans, 4 px radius,
   `surface` with `text-2` inside an `alpha-400` edge.
 - **Badges** (`Badge` and `GroupBadge` in `bits.tsx`) are Geist's subtle Badge, full radius: `md` 24 px,
   12 px / 500 (the group), `sm` 20 px, 11 px / 500 (the Focus marker on a Project card, `accent-text`
-  on a 10% `accent` tint). A Badge labels; it is never a button.
+  on a 10% `accent` tint). A Badge labels; it is never a button. `StatusMark` writes a Session's
+  Status – a Badge when busy or waiting, the dot and the word when quiet – and counts several in one
+  Status: *2 Sessions busy*.
 - **Empty State** (`Empty`) is Geist's: 48 px vertical padding and 24 px gaps, the icon in an 8 px
   radius box with 10 px padding and an edge, an optional `type-heading-16` title (an `h3`), a sentence
   of at most 340 px balanced over its lines, then an optional action.
