@@ -4,7 +4,6 @@
 :root {
   color-scheme: light;
   --ud-bg: #fafafa; /* background-200 */
-  --ud-rail: #fafafa;
   --ud-surface: #ffffff; /* background-100 */
   --ud-raised: #f2f2f2; /* gray-100 */
   --ud-line: #ebebeb; /* gray-400 */
@@ -56,7 +55,6 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   --ud-bg: #000000; /* background-200 */
-  --ud-rail: #000000;
   --ud-surface: #0a0a0a; /* background-100 */
   --ud-raised: #1a1a1a; /* gray-100 */
   --ud-line: #2e2e2e; /* gray-400 */

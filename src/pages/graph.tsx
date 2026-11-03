@@ -615,116 +615,121 @@ export function Graph() {
   const select = (id: string) => ({ selected: id === selected, onSelect: setSelected });
 
   return (
-    <div ref={box} className="relative h-full min-h-[480px] w-full overflow-hidden">
-      <h1 className="sr-only">Graph</h1>
-      {projects && projects.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Empty icon={<Icon name="graph" size={20} />} title="Nothing to draw yet.">
-            The Graph draws each Project once Undrift has found one.
-          </Empty>
-        </div>
-      )}
-      {size.w > 0 && graph.nodes.length > 0 && (
-        // Dragging the ground pans, a click on it closes the panel and a double-click fits the
-        // network again; a node keeps its own click.
-        <svg
-          ref={svg}
-          width={size.w}
-          height={size.h}
-          viewBox={fit(graph.nodes, size.w, size.h, open ? PANEL_WIDTH + 32 : 0)}
-          role="group"
-          aria-label="The Projects as a network, tied to their Area"
-          className="absolute inset-0 cursor-grab touch-none select-none active:cursor-grabbing"
-          onPointerDown={(e) => {
-            if (e.button !== 0 || (e.target as Element).closest("[role=button]")) return;
-            const p = toFitted(e.clientX, e.clientY);
-            if (!p) return;
-            pan.current = { id: e.pointerId, x: p.x, y: p.y, clientX: e.clientX, clientY: e.clientY };
-            e.currentTarget.setPointerCapture(e.pointerId);
-          }}
-          onPointerMove={(e) => {
-            const start = pan.current;
-            const p = start?.id === e.pointerId && toFitted(e.clientX, e.clientY);
-            if (!start || !p) return;
-            pan.current = { ...start, x: p.x, y: p.y };
-            changeView((v) => ({ ...v, x: v.x + p.x - start.x, y: v.y + p.y - start.y }));
-          }}
-          onPointerUp={(e) => {
-            const start = pan.current;
-            if (start && Math.hypot(e.clientX - start.clientX, e.clientY - start.clientY) < 4) setSelected(null);
-            pan.current = null;
-          }}
-          onPointerCancel={() => (pan.current = null)}
-          onDoubleClick={(e) => {
-            if (!(e.target as Element).closest("[role=button]")) changeView(() => FITTED);
-          }}
-        >
-          <g transform={`translate(${view.x},${view.y}) scale(${view.k})`}>
-          <g aria-hidden="true">
-            {graph.links.map((l) => {
-              const [a, b] = [at(l.source), at(l.target)];
-              if (!a || !b) return null;
-              return <line key={`${a.id}>${b.id}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} strokeWidth={1} className="stroke-border" />;
-            })}
-          </g>
-          {/* Sparks run from a busy Session to its Project and on to the Area, never under
-              reduced motion. */}
-          {!still && (
+    // The title sits above the network rather than over it, so no node ever slips under it.
+    <div className="flex h-full flex-col">
+      <header className="px-8 pt-8">
+        <h1 className="type-heading-24">Graph</h1>
+      </header>
+      <div ref={box} className="relative min-h-[480px] w-full grow overflow-hidden">
+        {projects && projects.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Empty icon={<Icon name="graph" size={20} />} title="Nothing to draw yet.">
+              The Graph draws each Project once Undrift has found one.
+            </Empty>
+          </div>
+        )}
+        {size.w > 0 && graph.nodes.length > 0 && (
+          // Dragging the ground pans, a click on it closes the panel and a double-click fits the
+          // network again; a node keeps its own click.
+          <svg
+            ref={svg}
+            width={size.w}
+            height={size.h}
+            viewBox={fit(graph.nodes, size.w, size.h, open ? PANEL_WIDTH + 32 : 0)}
+            role="group"
+            aria-label="The Projects as a network, tied to their Area"
+            className="absolute inset-0 cursor-grab touch-none select-none active:cursor-grabbing"
+            onPointerDown={(e) => {
+              if (e.button !== 0 || (e.target as Element).closest("[role=button]")) return;
+              const p = toFitted(e.clientX, e.clientY);
+              if (!p) return;
+              pan.current = { id: e.pointerId, x: p.x, y: p.y, clientX: e.clientX, clientY: e.clientY };
+              e.currentTarget.setPointerCapture(e.pointerId);
+            }}
+            onPointerMove={(e) => {
+              const start = pan.current;
+              const p = start?.id === e.pointerId && toFitted(e.clientX, e.clientY);
+              if (!start || !p) return;
+              pan.current = { ...start, x: p.x, y: p.y };
+              changeView((v) => ({ ...v, x: v.x + p.x - start.x, y: v.y + p.y - start.y }));
+            }}
+            onPointerUp={(e) => {
+              const start = pan.current;
+              if (start && Math.hypot(e.clientX - start.clientX, e.clientY - start.clientY) < 4) setSelected(null);
+              pan.current = null;
+            }}
+            onPointerCancel={() => (pan.current = null)}
+            onDoubleClick={(e) => {
+              if (!(e.target as Element).closest("[role=button]")) changeView(() => FITTED);
+            }}
+          >
+            <g transform={`translate(${view.x},${view.y}) scale(${view.k})`}>
             <g aria-hidden="true">
-              {busy.map((n) => {
-                const p = n.parent ? byId.get(n.parent) : undefined;
-                const h = p?.parent ? byId.get(p.parent) : undefined;
-                if (!p || !h) return null;
-                return (
-                  <circle key={n.id} r={4} className="fill-mark">
-                    <animateMotion dur="2.4s" repeatCount="indefinite" path={`M${n.x},${n.y} L${p.x},${p.y} L${h.x},${h.y}`} />
-                  </circle>
-                );
+              {graph.links.map((l) => {
+                const [a, b] = [at(l.source), at(l.target)];
+                if (!a || !b) return null;
+                return <line key={`${a.id}>${b.id}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} strokeWidth={1} className="stroke-border" />;
               })}
             </g>
-          )}
-          <g>
-            {graph.nodes
-              .filter((n) => n.kind === "session")
-              .map((n) => (
-                <SessionDot key={n.id} n={n} {...select(n.id)} />
-              ))}
-          </g>
-          <g>
-            {graph.nodes
-              .filter((n) => n.kind === "project")
-              .map((n) => (
-                <ProjectNode key={n.id} n={n} {...select(n.id)} />
-              ))}
-          </g>
-          <g>
-            {graph.nodes
-              .filter((n) => n.kind === "hub")
-              .map((n) => (
-                <HubNode key={n.id} n={n} {...select(n.id)} />
-              ))}
-          </g>
-          </g>
-        </svg>
-      )}
-      {graph.nodes.length > 0 && (
-        <>
-          <Legend />
-          {open && <NodePanel node={open} nodes={graph.nodes} now={now} onSelect={setSelected} onClose={() => setSelected(null)} />}
-          {/* The same zoom for the keyboard, and for whoever does not guess the wheel. */}
-          <div className="absolute right-4 bottom-4 flex gap-1 rounded-xl p-1 material-small">
-            <Action variant="tertiary" size="icon" aria-label="Zoom Out" disabled={view.k <= MIN_ZOOM} onClick={() => zoomBy(1 / 1.25)}>
-              <Icon name="zoomOut" />
-            </Action>
-            <Action variant="tertiary" size="icon" aria-label="Fit" disabled={view === FITTED} onClick={() => changeView(() => FITTED)}>
-              <Icon name="fit" />
-            </Action>
-            <Action variant="tertiary" size="icon" aria-label="Zoom In" disabled={view.k >= MAX_ZOOM} onClick={() => zoomBy(1.25)}>
-              <Icon name="zoomIn" />
-            </Action>
-          </div>
-        </>
-      )}
+            {/* Sparks run from a busy Session to its Project and on to the Area, never under
+                reduced motion. */}
+            {!still && (
+              <g aria-hidden="true">
+                {busy.map((n) => {
+                  const p = n.parent ? byId.get(n.parent) : undefined;
+                  const h = p?.parent ? byId.get(p.parent) : undefined;
+                  if (!p || !h) return null;
+                  return (
+                    <circle key={n.id} r={4} className="fill-mark">
+                      <animateMotion dur="2.4s" repeatCount="indefinite" path={`M${n.x},${n.y} L${p.x},${p.y} L${h.x},${h.y}`} />
+                    </circle>
+                  );
+                })}
+              </g>
+            )}
+            <g>
+              {graph.nodes
+                .filter((n) => n.kind === "session")
+                .map((n) => (
+                  <SessionDot key={n.id} n={n} {...select(n.id)} />
+                ))}
+            </g>
+            <g>
+              {graph.nodes
+                .filter((n) => n.kind === "project")
+                .map((n) => (
+                  <ProjectNode key={n.id} n={n} {...select(n.id)} />
+                ))}
+            </g>
+            <g>
+              {graph.nodes
+                .filter((n) => n.kind === "hub")
+                .map((n) => (
+                  <HubNode key={n.id} n={n} {...select(n.id)} />
+                ))}
+            </g>
+            </g>
+          </svg>
+        )}
+        {graph.nodes.length > 0 && (
+          <>
+            <Legend />
+            {open && <NodePanel node={open} nodes={graph.nodes} now={now} onSelect={setSelected} onClose={() => setSelected(null)} />}
+            {/* The same zoom for the keyboard, and for whoever does not guess the wheel. */}
+            <div className="absolute right-4 bottom-4 flex gap-1 rounded-xl p-1 material-small">
+              <Action variant="tertiary" size="icon" aria-label="Zoom Out" disabled={view.k <= MIN_ZOOM} onClick={() => zoomBy(1 / 1.25)}>
+                <Icon name="zoomOut" />
+              </Action>
+              <Action variant="tertiary" size="icon" aria-label="Fit" disabled={view === FITTED} onClick={() => changeView(() => FITTED)}>
+                <Icon name="fit" />
+              </Action>
+              <Action variant="tertiary" size="icon" aria-label="Zoom In" disabled={view.k >= MAX_ZOOM} onClick={() => zoomBy(1.25)}>
+                <Icon name="zoomIn" />
+              </Action>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

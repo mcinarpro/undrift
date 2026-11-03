@@ -8,19 +8,22 @@ the colour values below are Geist's own, read from vercel.com's stylesheet.
 
 ## Layout
 
-Undrift is laid out the way Vercel's dashboard is: a sidebar, a thin top bar, and pages rather than
-side panels. The window is at least 1100 × 700. Every page uses the full width of the window. A view
-is described here once it is built; until then this section holds what was decided.
+Undrift is laid out the way Vercel's dashboard is: one thin header with the pages as tabs, and pages
+rather than side panels. The window is at least 1100 × 700. Every page uses the full width of the
+window. A view is described here once it is built; until then this section holds what was decided.
 
-- **Sidebar** (240 px): the symbol and name · *Find…* (`F`) · Home, Projects, Graph · the
-  **NavUser** at the bottom, as shadcn's nav-user block – the avatar, name and `@login` of the
-  account `gh` is signed in to; its menu holds Open GitHub Profile, Settings, the theme (System,
-  Light, Dark) and Quit. The current page sits on `alpha-200`; a Project page belongs to Projects.
-- **Title bar**: the window has no native decorations. The sidebar header and the top bar share one
-  48 px line and are the drag region (double-click maximizes).
-- **Top bar** (48 px): a breadcrumb on the left (*Area / Project* on a Project page), the page title
-  in the centre (a label, not a heading), the page's actions on the right, then minimize, maximize
-  and close (close hides to the tray).
+- **Header** (48 px), the window's only bar, left to right: the lockup, which leads to Home · Home, Projects, Graph as
+  Geist's pill tabs – 32 px, 6 px radius, `type-label-14`, the current page on `alpha-200` in
+  `text`, `alpha-100` under the pointer, `text-2` otherwise; a Project page keeps Projects current ·
+  *Find…* (`F`), edged on `surface`, 240 px, pushed right · the account's 32 px round avatar (the
+  first letter of the login, or an empty circle when `gh` is signed out), an `alpha-100` ring on
+  hover · 12 px of space · minimize, maximize and close (close hides to the tray). It names no page
+  and holds no breadcrumb or action: each page shows its own. The avatar opens the **NavUser**, as
+  shadcn's nav-user block, downwards and aligned to its end – the name and `@login` of the account
+  `gh` is signed in to (*Not signed in* without one), then Open GitHub Profile, Settings, the theme
+  (System, Light, Dark) and Quit. The window has no native decorations, so the header is the title
+  bar: its empty parts drag the window and a double-click maximizes; the lockup, the tabs, Find, the
+  avatar and the controls never drag.
 - **Find** (`F` or `Ctrl K`): Geist's Command Menu over Projects, the last Sessions (Enter
   resumes), the pages and the actions.
 - **Home**, the first page (ADR 0001): the Loose Ends in three sections – Last Night (since 18:00 the
@@ -52,15 +55,17 @@ is described here once it is built; until then this section holds what was decid
   count, shown once there is more than one choice; it is kept while a Project page is open. Cards
   are 6 px, two across, three from 1280 px, four from 1536 px, the Drifting first (GLOSSARY.md
   § Drifting), then In Motion and Parked. A card opens its Project page.
-- **Project page**, shaped like Vercel's Project Overview: a **Where You Left Off** card – the Drift
+- **Project page**, shaped like Vercel's Project Overview: a page header – the breadcrumb, *Area /
+  Project*, whose Area leads back to Projects filtered by it, above the Project's name as the
+  title – then a **Where You Left Off** card – the Drift
   strip, Drift, Last Activity, Area, Last Session with its Status when open, the diff stat, Last
   Prompt – with the page's only primary Resume and New Session; then two columns from 1280 px: the
   Project's Issues (each with Start) and Earlier Sessions (each with Resume) on the left, Git and
   Focus on the right. Git says what was done and what is left – the branch, the GitHub repository,
   the last commit, the **Commits Not Pushed** by subject, newest first, and the **Changed Files**
   with `+n −n` or *new*. Focus is read-only: a Gauge of the days with Activity since the Project was
-  put in Focus. The breadcrumb's Area leads back to Projects filtered by it.
-- **Graph**: the Projects as a network (GLOSSARY.md), on a page of its own – a d3-force simulation
+  put in Focus.
+- **Graph**: the Projects as a network (GLOSSARY.md), on a page of its own under its title – a d3-force simulation
   in SVG, a hub per Area in its colour, a node per Project ringed in its group's colour, a node per
   open Session by Status – a 28 px disc with a robot glyph, busy in `accent` with a quarter ring
   turning around it, waiting in `text`, quiet hollow – and an earlier Session as a small `alpha-600`
@@ -89,7 +94,7 @@ is described here once it is built; until then this section holds what was decid
 Tokens live in `src/styles/theme.css` as `--ud-<token>` CSS variables with a light and a dark value.
 `src/index.css` maps shadcn's names onto them (`primary` = `button`, `secondary` / `muted` / `accent`
 backgrounds = `raised`, `muted-foreground` = `muted`, `border` = `line`, `ring` = `focus`,
-`destructive` = `error-text`) and exposes the rest as Tailwind colours (`rail`, `line-strong`,
+`destructive` = `error-text`) and exposes the rest as Tailwind colours (`line-strong`,
 `text-2`, `accent-text`, `mark`, `cell-off`, `shimmer`, `drifting`, `drifting-text`, `parked`, `button-hover`, `alpha-100` …
 `alpha-600`, `error`,
 `error-fill`, `error-line`, `error-bg`). Components use these classes, never a hex.
@@ -97,7 +102,6 @@ backgrounds = `raised`, `muted-foreground` = `muted`, `border` = `line`, `ring` 
 | Token | Light | Dark | Geist step · role |
 |---|---|---|---|
 | `bg` | `#fafafa` | `#000000` | background-200 · window ground |
-| `rail` | `#fafafa` | `#000000` | the rail |
 | `surface` | `#ffffff` | `#0a0a0a` | background-100 · cards, panel |
 | `raised` | `#f2f2f2` | `#1a1a1a` | gray-100 · secondary-button hover, disabled button, the last-Session box |
 | `line` | `#ebebeb` | `#2e2e2e` | gray-400 · edges |
@@ -165,7 +169,7 @@ System, Light or Dark, switched from the NavUser's menu; System follows `prefers
   | page title · the big figure | `type-heading-24` · `type-heading-32` | 24/32 · 32/40, 600, −0.96 / −1.28 px |
   | Empty State title | `type-heading-16` | 16/24, 600, −0.32 px |
   | Project card name | `type-heading-14` | 14/20, 600, −0.28 px |
-  | Panel and card title, row name, top-bar title | `type-label-14 font-medium` | 14/20, 500 – Geist's label-14 strong |
+  | Panel and card title, row name | `type-label-14 font-medium` | 14/20, 500 – Geist's label-14 strong |
   | one-line metadata, field label · axis | `type-label-13` · `type-label-12` | 13/16 · 12/16, 400 |
   | path, branch, Drift value | `type-label-13-mono` | 13/20 Geist Mono, 400 |
 
@@ -180,8 +184,8 @@ System, Light or Dark, switched from the NavUser's menu; System follows `prefers
 - Casing: headings, card and Panel titles, field labels, filter labels, buttons, menu items and
   Find's headings and actions are Title Case (*Where You Left Off*, *Needs You*, *In Motion*, *Last
   Activity*); running text and descriptions stay sentence case. Never small uppercase.
-- Structure: every page has one `h1` – visible on Home, Projects and Settings, `sr-only`
-  on the Project page and the Graph, whose title the top bar shows – and its cards and Panels are `h2`. Labelled
+- Structure: every page has one visible `h1` – the header names no page – and its cards and
+  Panels are `h2`. Labelled
   values are Geist's Description: a `<dl>` of `<dt>` / `<dd>` pairs.
 
 ## Drift strip
@@ -196,8 +200,8 @@ the information.
 - The Graph is the one place that moves on its own: the network settles into place, a ring turns
   around a busy Session as a spinner does, and sparks run from it to its Project and on to the Area. Under
   `prefers-reduced-motion` the layout settles at once and nothing moves.
-- Edges are a 1 px spread shadow (`edge` utility, `0 0 0 1px var(--ud-line)`), not `border`; the rail
-  and the top bar use a one-sided shadow. A drop target being hovered gets a 2 px `accent` ring.
+- Edges are a 1 px spread shadow (`edge` utility, `0 0 0 1px var(--ud-line)`), not `border`; the
+  header uses a one-sided shadow. A drop target being hovered gets a 2 px `accent` ring.
 - Cards wear Geist's material-small, as the Vercel dashboard's cards do: the `material-small` utility
   in `index.css` – `surface` behind `--ud-shadow-small`, the edge plus a small drop – with the radius
   as its own class, since cards come in 6 and 12 px. A hovered Project card lays a `line-strong` ring
@@ -205,7 +209,7 @@ the information.
   card draws the double ring itself. `--ud-shadow-medium`, `--ud-shadow-menu` and `--ud-shadow-modal` are
   Geist's other materials, each starting with the same edge.
 - Radius, fixed steps rather than multiples of `--radius`: 4 px `rounded-sm` · 6 px `rounded-md` for
-  buttons, rows, sidebar links, Project avatars, and the Project cards and list cards (the Projects grid), as on Vercel's dashboard · 8 px `rounded-lg` · 12 px `rounded-xl` for
+  buttons, rows, the header's tabs, Project avatars, and the Project cards and list cards (the Projects grid), as on Vercel's dashboard · 8 px `rounded-lg` · 12 px `rounded-xl` for
   Panels, the Project page's cards, Home's cards, dialogs and menus · 2 px for strip cells · full for dots and
   the NavUser's avatar, a person rather than a Project, as on Vercel.
 - Spacing on the 4 px grid. Separation by space and surface, not divider lines.
@@ -213,8 +217,8 @@ the information.
   `cubic-bezier(.175,.885,.32,1.1)`, over an `overlay` backdrop at 80% with no blur – an unlayered
   rule in `index.css`, so the generated dialog stays untouched.
 - Hover and selection are Geist's two steps on background-100: `alpha-100` under the pointer (rows,
-  sidebar links, the top-bar scope, the window controls, the Project pill), `alpha-200` for what is
-  current (the sidebar's page, the chosen segment). Buttons keep their own hovers (§ Components).
+  the header's tabs, the avatar's ring, the window controls, the Project pill), `alpha-200` for what
+  is current (the current tab, the chosen segment). Buttons keep their own hovers (§ Components).
 - Loading moves as Geist's: the Spinner's bars fade over a 1 s cycle, a Skeleton's gray-200 light
   sweeps across it every 1.5 s, both only under `motion-safe`. A toast rises 16 px and fades in over
   300 ms on the swift curve, and fades out.
@@ -234,7 +238,7 @@ into the toasts, where `Esc` dismisses the focused one.
 
 shadcn/ui on Base UI, restyled through the tokens. Each piece below lands with the first view that
 needs it, at the path it names. Icons: Lucide, shadcn's icon library
-(`components.json`), 2 px stroke – 20 px in the sidebar, 16 px inline.
+(`components.json`), 2 px stroke, 16 px inline.
 The logo comes from `art/` – never redrawn, never retyped; in the interface it takes the text colour.
 
 - **Buttons** are Geist's Button, through `src/components/action.tsx` (`Action`), never `ui/button`
@@ -242,13 +246,13 @@ The logo comes from `art/` – never redrawn, never retyped; in the interface it
   - `variant`: `primary` (`button` fill, `button-hover`, `on-button` label) · `secondary` (`surface`
     inside a 1 px `line` edge, `raised` on hover) · `tertiary` (no fill, `alpha-200` on hover) ·
     `error` (`error-fill`, white label, the fill darkened 12% on hover), only for an action that erases something.
-  - `size`: `small` 32 px, 12 px padding (the top bar, rows) · `medium` 36 px, 16 px padding (cards) ·
+  - `size`: `small` 32 px, 12 px padding (rows) · `medium` 36 px, 16 px padding (cards) ·
     `icon` a 32 px square with an `aria-label` · `tiny` a 24 px square with a 4 px radius, for a control inside a field.
     Geist's large size joins when a view needs it.
   - Focus is the double ring (§ Keyboard), drawn by the wrapper; the secondary keeps its edge inside it.
   - Disabled is greyed, not faded: `raised` fill, `muted` label, `line` edge.
   - `loading` is Geist's loading button: the Spinner takes the leading icon's place, the label stays,
-    and the button keeps its focus, says `aria-busy` and ignores clicks (Rescan in the top bar).
+    and the button keeps its focus, says `aria-busy` and ignores clicks.
   - Labels are Title Case: *Open Folder*, *New Session*, *Add to Focus*.
 - **Search field** (the Projects search) is Geist's Input: 36 px, `surface`, an `alpha-400` edge that
   turns `alpha-500` on hover and becomes `--ud-focus-border` on focus. While it holds a query, a tiny

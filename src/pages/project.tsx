@@ -3,6 +3,7 @@ import { openExternal } from "@/bridge";
 import { Action } from "@/components/action";
 import { Activity, AreaName, Diff, Field, Gauge, GroupBadge, StatusMark, useNow, When } from "@/components/bits";
 import { Icon } from "@/components/icon";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { fileLines, status } from "@/lib/home";
 import { drift, earlierSessions, focusDrift, group, lastSession } from "@/lib/projects";
 import { cn } from "@/lib/utils";
@@ -11,7 +12,34 @@ import type { Project as ProjectData } from "@/types";
 
 // A Project page (DESIGN.md § Layout), shaped like Vercel's Project Overview: Where You Left Off
 // answers "what was done here, and what is left?" before Resume, then the Issues, the Earlier
-// Sessions, Git and Focus. Its title is the top bar's, so the h1 is for screen readers.
+// Sessions, Git and Focus.
+
+/** The page's breadcrumb, Area / Project: the Area leads back to Projects filtered by it. */
+function ProjectBreadcrumb({ project }: { project: ProjectData }) {
+  const setAreaFilter = useStore((s) => s.setAreaFilter);
+  const area = project.area;
+  return (
+    // -ml-2 takes back the Area's padding, so its words line up with the title below.
+    <Breadcrumb aria-label="Breadcrumb" className="-ml-2 min-w-0">
+      <BreadcrumbList className="flex-nowrap gap-1 type-label-14">
+        <BreadcrumbItem className="min-w-0">
+          {/* A page here, not a URL: the Area is a button that sets the Projects filter. */}
+          <BreadcrumbLink
+            render={<button type="button" onClick={() => setAreaFilter(area ? { kind: "area", name: area.name } : { kind: "unsorted" })} />}
+            className="flex h-8 min-w-0 items-center rounded-md px-2 text-text-2 duration-150 hover:bg-alpha-100 hover:text-foreground"
+          >
+            <span className="truncate">{area?.name ?? "Unsorted"}</span>
+          </BreadcrumbLink>
+        </BreadcrumbItem>
+        {/* Vercel's slash rather than the generated chevron. */}
+        <BreadcrumbSeparator>/</BreadcrumbSeparator>
+        <BreadcrumbItem className="min-w-0">
+          <BreadcrumbPage className="truncate px-2 font-medium">{project.name}</BreadcrumbPage>
+        </BreadcrumbItem>
+      </BreadcrumbList>
+    </Breadcrumb>
+  );
+}
 
 /** A Panel: its title over a 12 px card. */
 function Panel({ title, count, children, className }: { title: string; count?: number; children: ReactNode; className?: string }) {
@@ -262,7 +290,10 @@ export function Project({ project }: { project: ProjectData }) {
   const now = useNow();
   return (
     <div className="flex w-full flex-col gap-8 px-8 py-8">
-      <h1 className="sr-only">{project.name}</h1>
+      <header className="flex min-w-0 flex-col gap-1">
+        <ProjectBreadcrumb project={project} />
+        <h1 className="truncate type-heading-24">{project.name}</h1>
+      </header>
       <WhereYouLeftOff project={project} now={now} />
       <div className="grid grid-cols-1 items-start gap-8 xl:grid-cols-2">
         <div className="flex min-w-0 flex-col gap-8">

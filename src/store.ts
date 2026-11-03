@@ -5,7 +5,7 @@ import type { AreaFilter } from "@/lib/projects";
 import { savedTheme, setTheme, type ThemeChoice } from "@/lib/theme";
 import type { NavUser, Project } from "@/types";
 
-/** The pages the sidebar leads to. */
+/** The pages the header leads to. */
 export type Page = "home" | "projects" | "graph" | "settings";
 
 type State = {

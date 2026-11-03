@@ -14,7 +14,6 @@
     --font-sans: "Geist Variable", system-ui, sans-serif;
     --font-mono: "Geist Mono Variable", ui-monospace, monospace;
     --font-heading: var(--font-sans);
-    --color-rail: var(--ud-rail);
     --color-line-strong: var(--ud-line-strong);
     --color-text-2: var(--ud-text-2);
     --color-cell-off: var(--ud-cell-off);
@@ -101,7 +100,7 @@
     --chart-4: var(--ud-muted);
     --chart-5: var(--ud-parked);
     --radius: 0.375rem;
-    --sidebar: var(--ud-rail);
+    --sidebar: var(--ud-bg);
     --sidebar-foreground: var(--ud-text);
     --sidebar-primary: var(--ud-button);
     --sidebar-primary-foreground: var(--ud-on-button);

@@ -1,6 +1,6 @@
 import type { Page } from "@/store";
 
-export const TITLES: Record<Page, string> = { home: "Home", projects: "Projects", graph: "Graph", settings: "Settings" };
+const TITLES: Record<Page, string> = { home: "Home", projects: "Projects", graph: "Graph", settings: "Settings" };
 
 // A page the shell leads to that is not built yet – Settings – with only its h1.
 export function Placeholder({ page }: { page: Page }) {
