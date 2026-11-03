@@ -1,5 +1,6 @@
 import {
   ArrowUpDown,
+  ArrowUpRight,
   Bot,
   ChevronDown,
   Ellipsis,
@@ -40,6 +41,8 @@ const ICONS = {
   light: Sun,
   dark: Moon,
   profile: ExternalLink,
+  // A page of Undrift, where ExternalLink leaves for the browser.
+  open: ArrowUpRight,
   quit: LogOut,
   minimize: Minus,
   maximize: Square,

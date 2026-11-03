@@ -36,7 +36,12 @@ window. A view is described here once it is built; until then this section holds
   lines each – then the Project's Drift strip with its active days, framed by the Project above and
   the numbers below. A Session at work or waiting on you must not slip by: its card comes first in its
   section and says *Busy* in a blue subtle Badge or *Waiting* on `alpha-200`; a quiet one keeps the
-  dot and the word. Let Go sits in a `⋯` menu.
+  dot and the word. Open Project and Let Go sit in a `⋯` menu, and a Project's name on any Home
+  card opens its page, underlined under the pointer. A Loose End's and a Ready to Start card's
+  header ends with a tiny tertiary arrow (*Open Project* in its Hint), faint – `muted` at 50% –
+  until the pointer is over the card, then in `text`. The page's `h1` greets the account by its
+  first name (*Hello, Mehmet*), *Home* while there is none, 16 px above the band rather than the
+  column's 32.
   Above the sections, a bento band of four columns says what matters by size: the first Loose End
   leaves its section for a 2×2 tile – its section and age, the Session title in `type-heading-24`,
   three lines of prompt, the Drift strip, its five most changed files (mono path, `+n −n` or *new*),

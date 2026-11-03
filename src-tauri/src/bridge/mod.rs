@@ -23,7 +23,7 @@ use sessions::{Session, Status};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver, TryRecvError};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
@@ -137,6 +137,34 @@ pub struct Read {
 pub struct Snapshot {
     pub projects: Vec<Project>,
     pub read: Read,
+}
+
+/// Folders git reads at once, and GitHub repositories `gh` reads at once. Each spends its time
+/// starting processes and waiting on the disk or the network, so a pass in sequence took as many
+/// times longer as there are Projects; `gh` keeps fewer, to stay gentle with GitHub's rate limit.
+const GIT_WORKERS: usize = 8;
+const GH_WORKERS: usize = 4;
+
+/// `f` over every item on up to `workers` threads, the answers in the items' order.
+fn in_parallel<T: Sync, R: Send>(items: &[T], workers: usize, f: impl Fn(&T) -> R + Sync) -> Vec<R> {
+    let next = AtomicUsize::new(0);
+    let mut done: Vec<(usize, R)> = std::thread::scope(|s| {
+        let threads: Vec<_> = (0..workers.min(items.len()))
+            .map(|_| {
+                s.spawn(|| {
+                    let mut mine = Vec::new();
+                    loop {
+                        let i = next.fetch_add(1, Ordering::Relaxed);
+                        let Some(item) = items.get(i) else { break mine };
+                        mine.push((i, f(item)));
+                    }
+                })
+            })
+            .collect();
+        threads.into_iter().flat_map(|t| t.join().unwrap_or_default()).collect()
+    });
+    done.sort_by_key(|(i, _)| *i);
+    done.into_iter().map(|(_, r)| r).collect()
 }
 
 /// Whether `gh api user` has answered since start, with an account or without one.
@@ -411,18 +439,24 @@ fn run(app: AppHandle, shared: Shared) {
             answer |= was_asked;
         }
 
-        // A new checkout under a root becomes a Project only once the roots are listed again. A
-        // folder the transcripts name for the first time is read at once, so it is never shown as
-        // no git repository until the next scan.
+        // A new checkout under a root becomes a Project only once the roots are listed again. git
+        // waits for the transcripts, which name the folders Sessions ran in, so the first pass reads
+        // every folder once rather than twice; after that, a folder named for the first time is
+        // read at once, so it is never shown as no git repository until the next scan.
         let mut repo_due = n % REPO_EVERY_TICKS == 0 || set_changed || config_changed;
         if repo_due || asked {
             known.discovered = config::discover(&config);
         }
         let paths = known.paths(&config);
-        repo_due |= paths != paths_seen;
-        paths_seen = paths.clone();
-        repo_scan.run(repo_due, asked, move || {
-            let repos = paths.iter().filter_map(|p| repo::read(p).map(|r| (p.clone(), r))).collect();
+        if read.sessions {
+            repo_due |= paths != paths_seen;
+            paths_seen = paths.clone();
+        } else {
+            repo_due = false;
+        }
+        repo_scan.run(repo_due, asked && read.sessions, move || {
+            let list: Vec<PathBuf> = paths.iter().cloned().collect();
+            let repos = in_parallel(&list, GIT_WORKERS, |p| repo::read(p)).into_iter().zip(list).filter_map(|(r, p)| Some((p, r?))).collect();
             (paths, repos)
         });
         if let Some(((covered, repos), was_asked)) = repo_scan.poll() {
@@ -432,14 +466,16 @@ fn run(app: AppHandle, shared: Shared) {
             answer |= was_asked;
         }
 
-        // Issues and descriptions are read once per GitHub repository, in sequence, and again as soon
-        // as a repo scan finds a repository that was not there before, so a new Project gets them at once.
+        // Issues and descriptions are read once per GitHub repository, a few at a time, and again as
+        // soon as a repo scan finds a repository that was not there before, so a new Project gets
+        // them at once.
         let now = known.github();
         let github_changed = now != github;
         github = now;
         let repos = github.clone();
         github_scan.run(n % GITHUB_EVERY_TICKS == 0 || github_changed, asked, move || {
-            let found = repos.iter().map(|r| GitHubRead { issues: issues::list(r), description: issues::description(r), repo: r.clone() }).collect();
+            let list: Vec<&String> = repos.iter().collect();
+            let found = in_parallel(&list, GH_WORKERS, |r| GitHubRead { issues: issues::list(r), description: issues::description(r), repo: (*r).clone() });
             (repos, found)
         });
         if let Some(((covered, found), was_asked)) = github_scan.poll() {

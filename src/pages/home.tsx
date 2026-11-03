@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Action } from "@/components/action";
-import { Activity, AreaName, AreaSwatch, DEFAULT_BRANCHES, Diff, Empty, LIVE_BADGE, ProjectAvatar, STATUS_DOT, useNow, When } from "@/components/bits";
+import { Activity, AreaName, AreaSwatch, DEFAULT_BRANCHES, Diff, Empty, Hint, LIVE_BADGE, ProjectAvatar, STATUS_DOT, useNow, When } from "@/components/bits";
 import { Icon } from "@/components/icon";
 import { Bar, useProjectsRead, useSkeleton } from "@/components/loading";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -18,38 +18,71 @@ import type { Issue, Project } from "@/types";
 // and the prompts need the width to read.
 const GRID = "grid grid-cols-2 gap-4 2xl:grid-cols-3";
 // Geist's material at 12 px, the radius of DESIGN.md's Panels: at 6 px the grid read as boxes.
-const TILE = "flex min-w-0 flex-col gap-3 rounded-xl p-4 material-small";
+// The card is a group, so what it holds can answer the pointer over the card as a whole.
+const TILE = "group/card flex min-w-0 flex-col gap-3 rounded-xl p-4 material-small";
 
 // Rows inside one card are separated by the edge colour on their top side.
 const ROW = "items-center gap-6 px-4 py-3 not-first:shadow-[0_-1px_0_0_var(--ud-line)]";
 
-/** The Project a Loose End belongs to, and the Status of its Session when one is open. */
+/** A Project's name that opens its page, as a link reads: underlined under the pointer. A card
+ * keeps its own buttons, so the name is the way in rather than the whole card. */
+function ProjectLink({ project, as: Tag = "span" }: { project: Project; as?: "span" | "h3" }) {
+  const openProject = useStore((s) => s.openProject);
+  return (
+    <Tag className="min-w-0 truncate type-label-14 font-medium">
+      <button type="button" onClick={() => openProject(project.path)} className="max-w-full truncate rounded-sm text-left underline-offset-4 hover:underline">
+        {project.name}
+      </button>
+    </Tag>
+  );
+}
+
+/** Open Project in one click, at the end of a card's header: an arrow out of the card, named in its
+ * Hint, for whoever does not think to click the name. It is always there, so the keyboard and a
+ * first look find it, but faint – `muted` at half – until the pointer is over the card, so a page
+ * of cards stays calm. */
+function OpenProject({ project }: { project: Project }) {
+  const openProject = useStore((s) => s.openProject);
+  return (
+    <Hint label="Open Project">
+      <Action variant="tertiary" size="tiny" aria-label={`Open ${project.name}`} onClick={() => openProject(project.path)} className="shrink-0 text-muted-foreground/50 group-hover/card:text-foreground">
+        <Icon name="open" />
+      </Action>
+    </Hint>
+  );
+}
+
+/** The Project a Loose End belongs to, the Status of its Session when one is open, and Open Project. */
 function LooseEndTop({ le, now }: { le: LooseEnd; now: Date }) {
   const { project, open } = le;
   const st = open && status(open, now);
   return (
     <header className="flex min-w-0 items-center gap-2">
       <ProjectAvatar name={project.name} color={project.area?.color} size={24} />
-      <span className="truncate type-label-14 font-medium">{project.name}</span>
+      <ProjectLink project={project} />
       <AreaName project={project} />
-      {st && (
-        <span
-          className={cn(
-            "ml-auto flex shrink-0 items-center gap-1.5",
-            LIVE_BADGE[st] ? cn("h-6 rounded-full px-2.5 text-xs font-medium", LIVE_BADGE[st]) : "type-label-13 text-text-2",
-          )}
-        >
-          <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[st])} />
-          {st}
-        </span>
-      )}
+      <span className="ml-auto flex shrink-0 items-center gap-2">
+        {st && (
+          <span
+            className={cn(
+              "flex items-center gap-1.5",
+              LIVE_BADGE[st] ? cn("h-6 rounded-full px-2.5 text-xs font-medium", LIVE_BADGE[st]) : "type-label-13 text-text-2",
+            )}
+          >
+            <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[st])} />
+            {st}
+          </span>
+        )}
+        <OpenProject project={project} />
+      </span>
     </header>
   );
 }
 
-/** Resume, primary only on the big tile so one button leads the page, and Let Go in a `⋯` menu. */
+/** Resume, primary only on the big tile so one button leads the page, then Open Project and Let Go
+ * in a `⋯` menu. */
 function LooseEndActions({ le, primary }: { le: LooseEnd; primary: boolean }) {
-  const { resume, letGo } = useStore();
+  const { resume, letGo, openProject } = useStore();
   const { project, session } = le;
   return (
     <div className="flex items-center gap-2">
@@ -64,6 +97,9 @@ function LooseEndActions({ le, primary }: { le: LooseEnd; primary: boolean }) {
           <Icon name="more" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48 rounded-xl p-1 ring-0 shadow-(--ud-shadow-menu)">
+          <DropdownMenuItem onClick={() => openProject(project.path)} className="h-9 gap-2 rounded-md px-2 text-sm">
+            Open Project
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => letGo(project.path, project.name)} className="h-9 gap-2 rounded-md px-2 text-sm">
             Let Go
           </DropdownMenuItem>
@@ -252,8 +288,11 @@ function ProjectIssues({ project, issues, all }: { project: Project; issues: Iss
     <article className={TILE}>
       <header className="flex min-w-0 items-center gap-2">
         <ProjectAvatar name={project.name} color={project.area?.color} size={24} />
-        <h3 className="truncate type-label-14 font-medium">{project.name}</h3>
+        <ProjectLink project={project} as="h3" />
         <span className="type-label-13 text-muted-foreground tabular-nums">{issues.length}</span>
+        <span className="ml-auto flex">
+          <OpenProject project={project} />
+        </span>
       </header>
       <ul className="flex flex-col gap-1">
         {shown.map((issue) => (
@@ -389,7 +428,7 @@ function NothingLeft({ projects, now }: { projects: Project[]; now: Date }) {
             <div key={project.path} className={cn("grid grid-cols-[minmax(0,1fr)_auto_110px_auto]", ROW)}>
               <span className="flex min-w-0 items-center gap-3">
                 <ProjectAvatar name={project.name} color={project.area?.color} size={28} />
-                <span className="truncate type-label-14 font-medium">{project.name}</span>
+                <ProjectLink project={project} />
               </span>
               <AreaName project={project} />
               <When iso={session.lastActivity} now={now} />
@@ -466,6 +505,8 @@ function ReadyToStartSkeleton() {
 
 export function Home() {
   const githubRead = useStore((s) => s.read.github);
+  // Home greets the account by its first name; without one it keeps its own.
+  const firstName = useStore((s) => s.user?.name.split(" ")[0]);
   const now = useNow();
   // The Loose Ends need the transcripts and git; Ready to Start needs GitHub as well. Until then
   // each shows its Skeletons, so Home never says *Nothing left half-done.* before it knows.
@@ -493,8 +534,9 @@ export function Home() {
     // `items-start` keeps it to its own height, or it would fill the row and have nowhere to stick.
     <div className={cn("grid w-full grid-cols-1 items-start gap-8 px-8 py-8", hasRightColumn && "xl:grid-cols-[minmax(0,1fr)_360px]")}>
       <div className="flex min-w-0 flex-col gap-8">
-        <header className="flex flex-col gap-1">
-          <h1 className="type-heading-24">Home</h1>
+        {/* The column keeps 32 px between its parts; the greeting sits closer to what it introduces. */}
+        <header className="-mb-4 flex flex-col gap-1">
+          <h1 className="type-heading-24">{firstName ? `Hello, ${firstName}` : "Home"}</h1>
           {projects && total > 0 && (
             <p className="type-copy-14 text-text-2">
               {total} Loose {total === 1 ? "End" : "Ends"}
