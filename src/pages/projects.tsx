@@ -4,7 +4,8 @@ import { Action } from "@/components/action";
 import { AreaSwatch, Empty, FocusBadge, GROUP_DOT, GroupBadge, GroupDot, ProjectAvatar, Segmented, StatusMark, useNow, When } from "@/components/bits";
 import { DriftStrip } from "@/components/drift-strip";
 import { Icon } from "@/components/icon";
-import { NO_MARKER, RailItem, RailSection } from "@/components/rail";
+import { Bar, useProjectsRead } from "@/components/loading";
+import { NO_MARKER, RailItem, RailSection, RailSkeleton } from "@/components/rail";
 import { failed } from "@/components/toast";
 import {
   DropdownMenu,
@@ -315,10 +316,31 @@ const VIEWS: { value: View; label: ReactNode; hint: string }[] = [
   },
 ];
 
+// Two across, three from 1120 px of page, four from 1472 px: a card keeps at least 360 px, the
+// room its header needs for a Focus marker and a Status beside the name.
+const CARD_GRID = "grid grid-cols-2 gap-4 @min-[70rem]:grid-cols-3 @min-[92rem]:grid-cols-4";
+
+/** A Project card in Skeletons: the avatar and name, a line of Git, the Drift strip. */
+function CardSkeleton() {
+  return (
+    <div className="flex min-w-0 flex-col gap-3 rounded-md p-4 material-small">
+      <div className="flex items-center gap-3">
+        <Bar className="size-8" />
+        <div className="flex grow flex-col gap-1.5">
+          <Bar className="h-4 w-1/2" />
+          <Bar className="h-3 w-2/3" />
+        </div>
+      </div>
+      <Bar className="h-4 w-3/4" />
+      <Bar className="h-3 w-full" />
+    </div>
+  );
+}
+
 export function Projects() {
-  const projects = useStore((s) => s.projects);
   const { areaFilter, groupFilter, sort, view, setFilters, setSort, setView } = useStore();
   const now = useNow();
+  const { phase, projects } = useProjectsRead();
   const all = projects ?? [];
   // An Area left without Projects leaves the rail, so its choice falls back to All: the page never
   // shows nothing with no row to tell why. A group's row stays at 0, so its choice stays too, and
@@ -334,7 +356,7 @@ export function Projects() {
 
   return (
     <div className="flex w-full">
-      <Rail projects={all} area={area} grp={grp} now={now} />
+      {projects ? <Rail projects={all} area={area} grp={grp} now={now} /> : phase === "skeleton" ? <RailSkeleton /> : <div className="w-60 shrink-0" />}
       {/* The grid answers to the width left beside the rail, not the window's. */}
       <div className="@container flex min-w-0 grow flex-col gap-6 px-8 py-8">
         <header className="flex flex-wrap items-end justify-between gap-4">
@@ -351,7 +373,23 @@ export function Projects() {
             <Segmented legend="View" name="view" value={view} options={VIEWS} onChange={setView} icons />
           </div>
         </header>
-        {/* Until the bridge's first list, the page holds only its title. */}
+        {phase === "skeleton" &&
+          (view === "grid" ? (
+            <div className={CARD_GRID}>
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <CardSkeleton key={i} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col rounded-md material-small">
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-3 not-first:shadow-[0_-1px_0_0_var(--ud-line)]">
+                  <Bar className="size-6" />
+                  <Bar className="h-4 w-1/3" />
+                </div>
+              ))}
+            </div>
+          ))}
         {projects &&
           (all.length === 0 ? (
             <div className="rounded-xl material-small">
@@ -373,9 +411,7 @@ export function Projects() {
               </Empty>
             </div>
           ) : view === "grid" ? (
-            // Two across, three from 1120 px of page, four from 1472 px: a card keeps at least
-            // 360 px, the room its header needs for a Focus marker and a Status beside the name.
-            <div className="grid grid-cols-2 gap-4 @min-[70rem]:grid-cols-3 @min-[92rem]:grid-cols-4">
+            <div className={CARD_GRID}>
               {shown.map((p) => (
                 <ProjectCard key={p.path} project={p} now={now} />
               ))}

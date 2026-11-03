@@ -134,7 +134,16 @@ window. A view is described here once it is built; until then this section holds
   use and removed if it is not opened.
 - **Settings**: the notification switch, then what still lives only in `config.json`.
 - **First load**: while the bridge reads the Projects, the page is its own shape in Skeletons – none
-  for a load under 200 ms, and at least 300 ms once shown.
+  for a load under 200 ms, and at least 300 ms once shown. The bridge reads in passes – the
+  transcripts, git, then GitHub – and says with each list which it holds, so a page never states
+  *nothing* about what is not read yet. Home, Projects and the Graph wait for the transcripts and
+  git: Home's band and a section of cards, Projects' rail and cards (or rows), the Graph's rail;
+  the network is drawn only once its Sessions are in. What comes from GitHub waits on its own: Ready
+  to Start is two cards of rows under its name, a Project page's Issues are rows in their card,
+  without a count, and its description is a line under the title. A Project page's Changes and Git
+  wait for git. Until `gh api user` answers, the NavUser's menu holds two lines in Skeletons rather
+  than *Not signed in*. The Skeleton in its place is the only sign that a pass runs: no spinner,
+  nothing that turns for good.
 - **Feedback**: a bridge call that fails says so in a toast (*Couldn’t resume the Session. Try
   again.*). Relative times tick every minute.
 
@@ -350,8 +359,10 @@ The logo comes from `art/` – never redrawn, never retyped; in the interface it
   ago*, in a `<time>`, with a Hint giving the local time and UTC, each after its zone in a mono chip.
 - **Spinner** (`Spinner` in `bits.tsx`) is Geist's: 16 px, ten 4 × 1.5 px bars 36° apart, in the text
   colour.
-- **Skeleton** (`Skeleton` in `bits.tsx`) is Geist's: `raised` (gray-100) with a `shimmer` band, a
-  5 px radius unless the shape it stands for has another; the caller gives the size.
+- **Skeleton** (`Bar` in `loading.tsx`, over the generated Skeleton, its pulse turned off) is
+  Geist's: `raised` (gray-100) with a `shimmer` band, a 5 px radius unless the shape it stands for
+  has another; the caller gives the size. A page's Skeletons sit in its own cards, so nothing moves
+  when the content comes; `useSkeleton` holds the 200 ms and 300 ms of *First load*.
 - **Gauge** (the Focus ring) is Geist's small Gauge: a `progressbar` with its value, maximum and a
   spoken text, drawn as two round-capped arcs – `accent` for the value, `cell-off` for the track –
   with a 9% gap at each end; a change eases over 1 s under `motion-safe`.

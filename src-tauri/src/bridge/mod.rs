@@ -23,6 +23,7 @@ use sessions::{Session, Status};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver, TryRecvError};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
@@ -44,9 +45,9 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     std::fs::rename(&tmp, path)
 }
 
-/// Full `Vec<Project>`, emitted whenever anything in it changes.
+/// A `Snapshot`, emitted whenever the Projects or what has been read of them changes.
 pub const PROJECTS_EVENT: &str = "projects";
-/// The NavUser, emitted once `gh api user` answered at start.
+/// The NavUser once `gh api user` answered at start; `null` when it could not tell who is signed in.
 pub const USER_EVENT: &str = "user";
 /// The loop ticks every second; the scans below run every so many ticks, and sooner when a
 /// Session opens or closes, the config changes or the window asks.
@@ -119,11 +120,35 @@ pub struct Project {
     pub loose_end: bool,
 }
 
+/// Which passes the list holds (src/types.ts `Read`). A pass counts once it finished after the one
+/// it depends on – git after the transcripts, which name the folders Sessions ran in, and GitHub
+/// after git, which names the repositories – so the window can tell "not read yet" from "nothing":
+/// no Loose End, no git repository, no open Issue.
+#[derive(Serialize, Clone, Copy, PartialEq, Default, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Read {
+    pub sessions: bool,
+    pub git: bool,
+    pub github: bool,
+}
+
+/// What the window is sent: the Projects, and which passes they hold (src/types.ts `Snapshot`).
+#[derive(Serialize, Clone, PartialEq, Debug)]
+pub struct Snapshot {
+    pub projects: Vec<Project>,
+    pub read: Read,
+}
+
+/// Whether `gh api user` has answered since start, with an account or without one.
+pub static USER_ANSWERED: AtomicBool = AtomicBool::new(false);
+
 /// Latest list, shared with the commands.
 #[derive(Default)]
 pub struct Latest {
     /// `None` until the first list is built, so the window can tell "not read yet" from "nothing".
     pub projects: Option<Vec<Project>>,
+    /// Which passes `projects` holds, sent with it.
+    pub read: Read,
     /// Set by the `rescan` command; the next tick rescans everything.
     pub rescan: bool,
     /// Set by the `let_go` command; the next tick rereads the Let Gos and sends the list again.
@@ -335,11 +360,13 @@ pub fn start(app: AppHandle) {
     // The NavUser has a thread of its own: `gh api user` and the avatar go over the network, and
     // the Project list must not wait for them.
     let handle = app.clone();
+    // It is sent even when `gh` could not say who is signed in, so the window stops waiting, and
+    // kept as answered for a window that starts listening after it went out.
     std::thread::spawn(move || {
-        if let Some(user) = user::refresh() {
-            if let Err(e) = handle.emit(USER_EVENT, &user) {
-                eprintln!("bridge: emit failed: {e}");
-            }
+        let user = user::refresh();
+        USER_ANSWERED.store(true, Ordering::Relaxed);
+        if let Err(e) = handle.emit(USER_EVENT, &user) {
+            eprintln!("bridge: emit failed: {e}");
         }
     });
     std::thread::spawn(move || run(app, shared));
@@ -349,9 +376,15 @@ fn run(app: AppHandle, shared: Shared) {
     let mut settings = Settings::new();
     let mut known = Known { discovered: config::discover(settings.config()), let_go: let_go::read(), ..Default::default() };
     let mut history_scan: Background<Vec<Record>> = Background::new();
-    let mut repo_scan: Background<HashMap<PathBuf, RepoRead>> = Background::new();
-    let mut github_scan: Background<Vec<GitHubRead>> = Background::new();
+    // Each pass hands back what it was asked to read, so a pass that started before a folder or a
+    // repository was known never counts for it.
+    let mut repo_scan: Background<(BTreeSet<PathBuf>, HashMap<PathBuf, RepoRead>)> = Background::new();
+    let mut github_scan: Background<(BTreeSet<String>, Vec<GitHubRead>)> = Background::new();
     let mut github = BTreeSet::new();
+    let mut paths_seen = BTreeSet::new();
+    let mut repos_covered = BTreeSet::new();
+    let mut github_covered = BTreeSet::new();
+    let mut read = Read::default();
     let mut n: u32 = 0;
     loop {
         let config_changed = settings.reload_if_changed();
@@ -373,19 +406,28 @@ fn run(app: AppHandle, shared: Shared) {
         history_scan.run(n % HISTORY_EVERY_TICKS == 0 || set_changed, asked, history::scan);
         if let Some((records, was_asked)) = history_scan.poll() {
             known.records = records;
+            read.sessions = true;
             dirty = true;
             answer |= was_asked;
         }
 
-        // A new checkout under a root becomes a Project only once the roots are listed again.
-        let repo_due = n % REPO_EVERY_TICKS == 0 || set_changed || config_changed;
+        // A new checkout under a root becomes a Project only once the roots are listed again. A
+        // folder the transcripts name for the first time is read at once, so it is never shown as
+        // no git repository until the next scan.
+        let mut repo_due = n % REPO_EVERY_TICKS == 0 || set_changed || config_changed;
         if repo_due || asked {
             known.discovered = config::discover(&config);
         }
-        let paths: Vec<PathBuf> = known.paths(&config).into_iter().collect();
-        repo_scan.run(repo_due, asked, move || paths.into_iter().filter_map(|p| repo::read(&p).map(|r| (p, r))).collect());
-        if let Some((repos, was_asked)) = repo_scan.poll() {
+        let paths = known.paths(&config);
+        repo_due |= paths != paths_seen;
+        paths_seen = paths.clone();
+        repo_scan.run(repo_due, asked, move || {
+            let repos = paths.iter().filter_map(|p| repo::read(p).map(|r| (p.clone(), r))).collect();
+            (paths, repos)
+        });
+        if let Some(((covered, repos), was_asked)) = repo_scan.poll() {
             known.repos = repos;
+            repos_covered = covered;
             dirty = true;
             answer |= was_asked;
         }
@@ -397,9 +439,11 @@ fn run(app: AppHandle, shared: Shared) {
         github = now;
         let repos = github.clone();
         github_scan.run(n % GITHUB_EVERY_TICKS == 0 || github_changed, asked, move || {
-            repos.into_iter().map(|r| GitHubRead { issues: issues::list(&r), description: issues::description(&r), repo: r }).collect()
+            let found = repos.iter().map(|r| GitHubRead { issues: issues::list(r), description: issues::description(r), repo: r.clone() }).collect();
+            (repos, found)
         });
-        if let Some((found, was_asked)) = github_scan.poll() {
+        if let Some(((covered, found), was_asked)) = github_scan.poll() {
+            github_covered = covered;
             // A call that failed keeps what it had, and a repository no Project has any more goes.
             for f in found {
                 if let Some(i) = f.issues {
@@ -415,20 +459,30 @@ fn run(app: AppHandle, shared: Shared) {
             answer |= was_asked;
         }
 
+        // Once a pass holds everything there is, it counts for good: a folder or a repository that
+        // shows up later is read by the next pass, and the window keeps its page meanwhile rather
+        // than fall back to Skeletons. A `gh` call that failed counts as read: what it could not
+        // read is an error, not a wait, and waiting for it could last for good.
+        let was = read;
+        read.git |= read.sessions && paths_seen.is_subset(&repos_covered);
+        read.github |= read.git && github.is_subset(&github_covered);
+        dirty |= read != was;
+
         if dirty {
             let list = known.build(&config);
             let changed = shared
                 .lock()
                 .map(|mut l| {
-                    let changed = answer || l.projects.as_ref() != Some(&list);
+                    let changed = answer || l.projects.as_ref() != Some(&list) || l.read != read;
                     if changed {
                         l.projects = Some(list.clone());
+                        l.read = read;
                     }
                     changed
                 })
                 .unwrap_or(false);
             if changed {
-                if let Err(e) = app.emit(PROJECTS_EVENT, &list) {
+                if let Err(e) = app.emit(PROJECTS_EVENT, &Snapshot { projects: list, read }) {
                     eprintln!("bridge: emit failed: {e}");
                 }
             }

@@ -3,7 +3,8 @@ import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type
 import { Action } from "@/components/action";
 import { Activity, AreaName, AreaSwatch, Diff, Empty, Field, GroupBadge, GroupDot, Hint, ProjectAvatar, STATUS_DOT, StatusMark, useNow, When } from "@/components/bits";
 import { Icon } from "@/components/icon";
-import { lightHandlers, RailItem, RailSection, type LightBy } from "@/components/rail";
+import { useProjectsRead } from "@/components/loading";
+import { lightHandlers, RailItem, RailSection, RailSkeleton, type LightBy } from "@/components/rail";
 import { age, looseEnds, status, type LooseEnd, type StatusName } from "@/lib/home";
 import { areaFilters, drift, group, lastSession, ordered, type Group } from "@/lib/projects";
 import { cn } from "@/lib/utils";
@@ -652,7 +653,9 @@ function GraphRail({
 }
 
 export function Graph() {
-  const projects = useStore((s) => s.projects);
+  // The network waits for the transcripts and git, so it is not drawn without its Sessions and then
+  // set moving again when they come in; meanwhile the rail stands in Skeletons.
+  const { phase, projects } = useProjectsRead();
   const now = useNow();
   const still = useReducedMotion();
   const box = useRef<HTMLDivElement>(null);
@@ -795,6 +798,7 @@ export function Graph() {
 
   return (
     <div className="flex h-full">
+      {phase === "skeleton" && <RailSkeleton />}
       {projects && projects.length > 0 && (
         <GraphRail
           projects={projects}

@@ -105,6 +105,24 @@ export type Project = {
   looseEnd: boolean;
 };
 
+/** Which of the bridge's passes the list holds. Until one is in, what it reads is not known, which
+ * is not the same as nothing: no Loose End, no git repository, no open Issue. */
+export type Read = {
+  /** The transcripts: the Sessions and the folders they ran in. */
+  sessions: boolean;
+  /** git in every Project folder: the Loose Ends and `repo`. */
+  git: boolean;
+  /** `gh` for every GitHub repository: `issues` and the description. */
+  github: boolean;
+};
+
+/** What the bridge sends: the Projects, and which passes they hold. */
+export type Snapshot = { projects: Project[]; read: Read };
+
+/** The cached NavUser, and whether `gh api user` already answered: an answer that went out before
+ * the window listened still tells it to stop waiting. */
+export type NavUserNow = { user: NavUser | null; answered: boolean };
+
 /** The GitHub account `gh` is signed in to, shown as the avatar at the end of the header. */
 export type NavUser = {
   login: string;

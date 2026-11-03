@@ -5,11 +5,11 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, WindowEvent};
 
-/// Latest list, so the window has something to show before the first event; `None` until the
-/// bridge built its first one.
+/// Latest list and what it holds, so the window has something to show before the first event;
+/// `None` until the bridge built its first one.
 #[tauri::command]
-async fn projects_now(shared: tauri::State<'_, bridge::Shared>) -> Result<Option<Vec<bridge::Project>>, ()> {
-    Ok(shared.lock().ok().and_then(|l| l.projects.clone()))
+async fn projects_now(shared: tauri::State<'_, bridge::Shared>) -> Result<Option<bridge::Snapshot>, ()> {
+    Ok(shared.lock().ok().and_then(|l| l.projects.clone().map(|projects| bridge::Snapshot { projects, read: l.read })))
 }
 
 /// The Project the window names, from the bridge's own list: the window never chooses the folder
@@ -79,10 +79,17 @@ async fn rescan(shared: tauri::State<'_, bridge::Shared>) -> Result<(), ()> {
     Ok(())
 }
 
-/// The NavUser from the cache, so the header has it before `gh` answers; the `user` event follows.
+/// The NavUser from the cache, so the header has it before `gh` answers, and whether `gh` already
+/// answered; the `user` event follows when it has not (src/types.ts `NavUserNow`).
+#[derive(serde::Serialize)]
+struct NavUserNow {
+    user: Option<bridge::user::NavUser>,
+    answered: bool,
+}
+
 #[tauri::command]
-async fn nav_user() -> Option<bridge::user::NavUser> {
-    bridge::user::cached()
+async fn nav_user() -> NavUserNow {
+    NavUserNow { user: bridge::user::cached(), answered: bridge::USER_ANSWERED.load(std::sync::atomic::Ordering::Relaxed) }
 }
 
 /// The cached avatar as raw bytes, empty when there is none yet: the window makes a Blob of it, so

@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Action } from "@/components/action";
 import { Activity, AreaName, AreaSwatch, DEFAULT_BRANCHES, Diff, Empty, LIVE_BADGE, ProjectAvatar, STATUS_DOT, useNow, When } from "@/components/bits";
 import { Icon } from "@/components/icon";
+import { Bar, useProjectsRead, useSkeleton } from "@/components/loading";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { fileLines, figures, issuesByProject, looseEnds, needsYou, status, touchedLast, type LooseEnd, type NeedRow, type OpenPart, type Part, type Section as SectionName } from "@/lib/home";
 import { cn } from "@/lib/utils";
@@ -403,9 +404,73 @@ function NothingLeft({ projects, now }: { projects: Project[]; now: Date }) {
   );
 }
 
+/** Home in Skeletons while the Loose Ends are read: the band – the big tile and the four figures –
+ * then a section of cards, so the page keeps its shape when they come in. */
+function HomeSkeleton() {
+  return (
+    <>
+      <div className="grid grid-cols-4 gap-4">
+        <div className={cn(TILE, "col-span-2 row-span-2 gap-4 p-6")}>
+          <Bar className="h-6 w-1/3" />
+          <Bar className="h-8 w-3/4" />
+          <Bar className="h-4 w-2/3" />
+          <Bar className="mt-auto h-8 w-24" />
+        </div>
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className={cn(TILE, "gap-4")}>
+            <Bar className="h-8 w-16" />
+            <Bar className="h-3 w-24" />
+            <Bar className="mt-auto h-12 w-full" />
+          </div>
+        ))}
+      </div>
+      <section className="flex flex-col gap-3">
+        <Bar className="h-4 w-24" />
+        <div className={GRID}>
+          {[0, 1].map((i) => (
+            <div key={i} className={TILE}>
+              <Bar className="h-6 w-1/2" />
+              <Bar className="h-5 w-3/4" />
+              <Bar className="h-4 w-full" />
+              <Bar className="h-8 w-24" />
+            </div>
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+/** Ready to Start in Skeletons while `gh` has not answered: its name, then two cards of rows, in
+ * the place the Issues will take. Never *nothing*, since no card is not the same as not read. */
+function ReadyToStartSkeleton() {
+  return (
+    <section className="flex flex-col gap-3">
+      <h2 className="type-label-14 font-medium">Ready to Start</h2>
+      <div className={ISSUES_GRID}>
+        {[0, 1].map((i) => (
+          <div key={i} className={TILE}>
+            <div className="flex items-center gap-2">
+              <Bar className="size-6" />
+              <Bar className="h-4 w-28" />
+            </div>
+            {[0, 1, 2].map((j) => (
+              <Bar key={j} className="h-4 w-full" />
+            ))}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function Home() {
-  const projects = useStore((s) => s.projects);
+  const githubRead = useStore((s) => s.read.github);
   const now = useNow();
+  // The Loose Ends need the transcripts and git; Ready to Start needs GitHub as well. Until then
+  // each shows its Skeletons, so Home never says *Nothing left half-done.* before it knows.
+  const { phase: loosePhase, projects } = useProjectsRead();
+  const issuesPhase = useSkeleton(loosePhase !== "ready" || !githubRead);
   const groups = projects ? looseEnds(projects, now) : [];
   const total = groups.reduce((n, g) => n + g.items.length, 0);
   const night = groups.find((g) => g.section === "Last Night")?.items.length ?? 0;
@@ -414,12 +479,13 @@ export function Home() {
   const hero = groups[0]?.items[0];
   const rest = groups.map((g) => ({ ...g, items: g.items.filter((le) => le !== hero) })).filter((g) => g.items.length > 0);
   const fig = projects && figures(groups, projects, now);
-  const issues = projects ? issuesByProject(projects) : [];
+  const issues = projects && issuesPhase === "ready" ? issuesByProject(projects) : [];
   const needs = projects ? needsYou(projects, now) : { waiting: [], busy: [], quiet: [] };
   const needed = needs.waiting.length + needs.busy.length + needs.quiet.length > 0;
+  const issuesShown = issues.length > 0 || issuesPhase === "skeleton";
   // The right column is drawn only with something in it, so an empty one takes no width; under
   // 1280 px it holds only Ready to Start, since Needs You shows from there.
-  const hasRightColumn = issues.length > 0 || needed;
+  const hasRightColumn = issuesShown || needed;
 
   return (
     // One column under 1280 px, where the right column falls under the Loose Ends as Ready to Start
@@ -436,7 +502,7 @@ export function Home() {
             </p>
           )}
         </header>
-        {/* Until the bridge's first list, the page holds only its title. */}
+        {loosePhase === "skeleton" && <HomeSkeleton />}
         {projects &&
           (!hero || !fig ? (
             <NothingLeft projects={projects} now={now} />
@@ -475,11 +541,11 @@ export function Home() {
         <aside
           className={cn(
             "flex min-w-0 flex-col gap-8 xl:sticky xl:top-7 xl:-m-1 xl:max-h-[calc(100dvh-6.5rem)] xl:overflow-y-auto xl:p-1",
-            issues.length === 0 && "max-xl:hidden",
+            !issuesShown && "max-xl:hidden",
           )}
         >
           <NeedsYou waiting={needs.waiting} busy={needs.busy} quiet={needs.quiet} now={now} />
-          <ReadyToStart groups={issues} />
+          {issuesPhase === "skeleton" ? <ReadyToStartSkeleton /> : <ReadyToStart groups={issues} />}
         </aside>
       )}
     </div>

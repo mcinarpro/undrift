@@ -72,6 +72,14 @@
     --radius-2xl: 16px;
     --radius-3xl: calc(var(--radius) * 2.2);
     --radius-4xl: calc(var(--radius) * 2.6);
+    /* Geist's Skeleton light: a gray-200 band that sweeps across every 1.5 s (DESIGN.md § Shape
+       and motion). */
+    --animate-shimmer: shimmer 1.5s ease-in-out infinite;
+    @keyframes shimmer {
+        to {
+            transform: translateX(100%);
+        }
+    }
 }
 
 /* shadcn's semantic names, mapped onto Undrift's tokens. They follow the theme through the tokens. */

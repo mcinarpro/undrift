@@ -1,5 +1,6 @@
 import { openExternal } from "@/bridge";
 import { Icon, type IconName } from "@/components/icon";
+import { Bar } from "@/components/loading";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,14 +38,15 @@ function Avatar({ src, login }: { src: string | null; login: string | undefined 
 // shadcn's nav-user block as the avatar at the header's right end, where GitHub and Vercel put the
 // account and people look for it: who you are heads its menu, then the quiet things.
 export function NavUser() {
-  const { user, avatar, go, theme, setTheme, quit } = useStore();
+  const { user, userKnown, avatar, go, theme, setTheme, quit } = useStore();
   // Without a cached user – `gh` signed out, missing, or not answered yet – the menu stays, since
-  // Settings, the theme and Quit do not depend on the account.
+  // Settings, the theme and Quit do not depend on the account. Until `gh` answers, the account is
+  // not known rather than signed out, so the menu holds its place in Skeletons.
   return (
     <DropdownMenu>
       {/* The ring on hover replaces the base focus ring, so the trigger draws the double ring itself. */}
       <DropdownMenuTrigger
-        aria-label={user ? `Account – ${user.name}` : "Account – Not signed in"}
+        aria-label={user ? `Account – ${user.name}` : userKnown ? "Account – Not signed in" : "Account"}
         className="flex size-8 items-center justify-center rounded-full transition-shadow duration-150 hover:shadow-[0_0_0_4px_var(--ud-alpha-100)] focus-visible:shadow-[0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--ud-focus)]"
       >
         <Avatar src={avatar} login={user?.login} />
@@ -58,8 +60,13 @@ export function NavUser() {
                 <span className="truncate type-label-14 font-medium text-foreground">{user.name}</span>
                 <span className="truncate type-label-13 font-normal text-muted-foreground">@{user.login}</span>
               </>
-            ) : (
+            ) : userKnown ? (
               <span className="truncate type-label-14 font-normal text-text-2">Not signed in</span>
+            ) : (
+              <span className="flex flex-col gap-1.5 py-0.5">
+                <Bar className="h-4 w-28" />
+                <Bar className="h-3 w-20" />
+              </span>
             )}
           </DropdownMenuLabel>
         </DropdownMenuGroup>

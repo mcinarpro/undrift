@@ -3,7 +3,7 @@ import * as bridge from "@/bridge";
 import { failed, toasts } from "@/components/toast";
 import { SORTS, type AreaFilter, type GroupFilter, type Sort } from "@/lib/projects";
 import { savedTheme, setTheme, type ThemeChoice } from "@/lib/theme";
-import type { NavUser, Project } from "@/types";
+import type { NavUser, Project, Read } from "@/types";
 
 /** The pages the header leads to. */
 export type Page = "home" | "projects" | "graph" | "settings";
@@ -42,12 +42,17 @@ type State = {
   view: View;
   findOpen: boolean;
   theme: ThemeChoice;
-  /** Null until the bridge answers, or for good when `gh` is signed out. */
+  /** Null until the cache or `gh` answers, and while `gh` has never seen an account: a `gh` that
+   * fails later keeps the cached one. */
   user: NavUser | null;
+  /** Whether `user` is an answer – from the cache or from `gh` – so a null one means signed out. */
+  userKnown: boolean;
   /** A Blob URL of the cached avatar; null shows the initial instead. */
   avatar: string | null;
   /** Null until the bridge built its first list, so Home never flashes its Empty State. */
   projects: Project[] | null;
+  /** Which passes `projects` holds; a page waits for those it reads before saying there is nothing. */
+  read: Read;
   go: (page: Page) => void;
   openProject: (path: string) => void;
   setAreaFilter: (filter: AreaFilter) => void;
@@ -74,8 +79,10 @@ export const useStore = create<State>((set) => ({
   findOpen: false,
   theme: savedTheme(),
   user: null,
+  userKnown: false,
   avatar: null,
   projects: null,
+  read: { sessions: false, git: false, github: false },
   go: (page) => set({ page, project: null, findOpen: false }),
   openProject: (path) => set({ page: "projects", project: path, findOpen: false }),
   // The breadcrumb's Area leads back to the Projects page filtered by it. The group filter goes
@@ -119,7 +126,8 @@ export const useStore = create<State>((set) => ({
 
 // A Project that left the list – hidden, or its folder gone – closes its page for good, so it
 // cannot reopen by surprise if it comes back on a later refresh.
-bridge.watchProjects((projects) =>
-  useStore.setState((s) => ({ projects, project: s.project && projects.some((p) => p.path === s.project) ? s.project : null })),
+bridge.watchProjects(({ projects, read }) =>
+  useStore.setState((s) => ({ projects, read, project: s.project && projects.some((p) => p.path === s.project) ? s.project : null })),
 ).catch((e) => console.error("projects:", e));
-bridge.watchUser((user, avatar) => useStore.setState({ user, avatar })).catch((e) => console.error("nav user:", e));
+// `gh` that cannot answer – signed out or offline – keeps the cached account, as before it was asked.
+bridge.watchUser((user, avatar) => useStore.setState(user ? { user, avatar, userKnown: true } : { userKnown: true })).catch((e) => console.error("nav user:", e));

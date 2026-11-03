@@ -3,6 +3,7 @@ import { openExternal } from "@/bridge";
 import { Action, SplitAction } from "@/components/action";
 import { Activity, AreaName, AreaSwatch, Badge, Diff, Field, Gauge, GroupBadge, ProjectAvatar, StatusMark, useNow, When } from "@/components/bits";
 import { Icon } from "@/components/icon";
+import { Bar, useSkeleton } from "@/components/loading";
 import { failed } from "@/components/toast";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -65,6 +66,7 @@ function None({ children }: { children: ReactNode }) {
 }
 
 function WhereYouLeftOff({ project, now }: { project: ProjectData; now: Date }) {
+  const gitPhase = useSkeleton(!useStore((s) => s.read.git));
   const last = lastSession(project);
   const st = last?.open && status(last.open, now);
   const left = project.repo && (project.repo.changed > 0 || (project.repo.unpushed ?? 0) > 0);
@@ -87,7 +89,9 @@ function WhereYouLeftOff({ project, now }: { project: ProjectData; now: Date }) 
             {st && <StatusMark status={st} />}
           </Field>
           <Field label="Changes">
-            {!project.repo ? (
+            {gitPhase !== "ready" ? (
+              gitPhase === "skeleton" && <Bar className="h-4 w-24" />
+            ) : !project.repo ? (
               <span className="text-muted-foreground">Not a git repository</span>
             ) : left ? (
               <Diff project={project} />
@@ -172,6 +176,7 @@ function AreaBadge({ project }: { project: ProjectData }) {
  * actions never wrap under it. */
 function ProjectHeader({ project, rows, now }: { project: ProjectData; rows: OpenRow[]; now: Date }) {
   const repo = project.repo;
+  const phase = useGitHubPhase(project);
   return (
     <header className="flex min-w-0 flex-col gap-1">
       <ProjectBreadcrumb project={project} />
@@ -190,6 +195,8 @@ function ProjectHeader({ project, rows, now }: { project: ProjectData; rows: Ope
           )}
         </div>
       </div>
+      {/* The description comes with the Issues, from `gh`; its line is held until then. */}
+      {phase === "skeleton" && repo?.github && !repo.description && <Bar className="my-0.5 h-4 w-96 max-w-full" />}
       {repo?.description && <p className="max-w-3xl type-copy-14 text-text-2">{repo.description}</p>}
     </header>
   );
@@ -213,12 +220,34 @@ function SessionsOpen({ rows, now }: { rows: OpenRow[]; now: Date }) {
   );
 }
 
+/** Rows in Skeletons, in a card whose content is not read yet; blank for the first 200 ms, at the
+ * height of one row, so the card neither flashes nor jumps. */
+function RowsSkeleton({ phase }: { phase: "blank" | "skeleton" }) {
+  if (phase === "blank") return <div aria-hidden="true" className="h-11" />;
+  return [0, 1, 2].map((i) => (
+    <div key={i} aria-hidden="true" className={ROW}>
+      <Bar className="h-4 w-8" />
+      <Bar className="h-4 grow" />
+    </div>
+  ));
+}
+
+/** Whether a Project's Issues and description are known: git says whether it is on GitHub, then
+ * `gh` says what is there. A Project off GitHub has none to wait for. */
+function useGitHubPhase(project: ProjectData) {
+  const read = useStore((s) => s.read);
+  return useSkeleton(!read.git || (!!project.repo?.github && !read.github));
+}
+
 function Issues({ project, now }: { project: ProjectData; now: Date }) {
   const start = useStore((s) => s.start);
+  const phase = useGitHubPhase(project);
   const issues = [...project.issues].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   return (
-    <Panel title="Issues" count={issues.length}>
-      {issues.length === 0 ? (
+    <Panel title="Issues" count={phase === "ready" ? issues.length : undefined}>
+      {phase !== "ready" ? (
+        <RowsSkeleton phase={phase} />
+      ) : issues.length === 0 ? (
         <None>{project.repo?.github ? "No open Issue." : "No GitHub repository, so no Issues."}</None>
       ) : (
         issues.map((issue) => (
@@ -279,6 +308,14 @@ function GitList({ title, count, children }: { title: string; count: number; chi
  * first, and the files changed by name – never their contents (AGENTS.md § Privacy contract). */
 function Git({ project, now }: { project: ProjectData; now: Date }) {
   const repo = project.repo;
+  const phase = useSkeleton(!useStore((s) => s.read.git));
+  if (phase !== "ready") {
+    return (
+      <Panel title="Git">
+        <RowsSkeleton phase={phase} />
+      </Panel>
+    );
+  }
   if (!repo) {
     return (
       <Panel title="Git">

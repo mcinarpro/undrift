@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import type { NavUser, Project } from "@/types";
+import type { NavUser, NavUserNow, Snapshot } from "@/types";
 
 // The window's only door to the Rust bridge (src-tauri/src/lib.rs commands, bridge/mod.rs events).
 // In a plain browser there is no bridge: a sample user stands in and the window actions do nothing.
@@ -10,6 +10,14 @@ import type { NavUser, Project } from "@/types";
 export const inTauri = "__TAURI_INTERNALS__" in window;
 
 const SAMPLE_USER: NavUser = { login: "mcinarpro", name: "Mehmet Cinar", profileUrl: "https://github.com/mcinarpro" };
+
+// A development switch to watch the Skeletons, which a fast bridge hides: `VITE_SLOW_BRIDGE=5000
+// bun tauri dev` holds back every list and the NavUser that many milliseconds. A build ignores it.
+const SLOW = import.meta.env.DEV ? Number(import.meta.env.VITE_SLOW_BRIDGE ?? 0) : 0;
+const later =
+  <A extends unknown[]>(f: (...args: A) => void) =>
+  (...args: A) =>
+    SLOW > 0 ? void setTimeout(() => f(...args), SLOW) : f(...args);
 
 let avatarUrl: string | null = null;
 
@@ -21,27 +29,30 @@ async function avatar(): Promise<string | null> {
   return avatarUrl;
 }
 
-/** Calls `onUser` with the cached NavUser, then again once `gh api user` answered. */
-export async function watchUser(onUser: (user: NavUser, avatar: string | null) => void): Promise<void> {
+/** Calls `onUser` with the cached NavUser, then again once `gh api user` answered – with null when
+ * it could not say who is signed in. */
+export async function watchUser(onUser: (user: NavUser | null, avatar: string | null) => void): Promise<void> {
+  onUser = later(onUser);
   if (!inTauri) {
     onUser(SAMPLE_USER, null);
     return;
   }
-  await listen<NavUser>("user", async (e) => onUser(e.payload, await avatar()));
-  const cached = await invoke<NavUser | null>("nav_user");
-  if (cached) onUser(cached, await avatar());
+  await listen<NavUser | null>("user", async (e) => onUser(e.payload, e.payload && (await avatar())));
+  const now = await invoke<NavUserNow>("nav_user");
+  if (now.user || now.answered) onUser(now.user, now.user && (await avatar()));
 }
 
-/** Calls `onProjects` with the bridge's list once it has one, then on every change. In a plain
- * browser the list is empty, so Home shows its Empty State. */
-export async function watchProjects(onProjects: (projects: Project[]) => void): Promise<void> {
+/** Calls `onSnapshot` with the bridge's list once it has one, then on every change. In a plain
+ * browser the list is empty and read, so Home shows its Empty State. */
+export async function watchProjects(onSnapshot: (snapshot: Snapshot) => void): Promise<void> {
+  onSnapshot = later(onSnapshot);
   if (!inTauri) {
-    onProjects([]);
+    onSnapshot({ projects: [], read: { sessions: true, git: true, github: true } });
     return;
   }
-  await listen<Project[]>("projects", (e) => onProjects(e.payload));
-  const now = await invoke<Project[] | null>("projects_now");
-  if (now) onProjects(now);
+  await listen<Snapshot>("projects", (e) => onSnapshot(e.payload));
+  const now = await invoke<Snapshot | null>("projects_now");
+  if (now) onSnapshot(now);
 }
 
 // The bridge checks the Project, Session and Issue against its own list before opening anything.
