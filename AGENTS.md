@@ -2,7 +2,7 @@
 
 Undrift is a desktop cockpit for getting back into work left half-done: it opens on the Loose Ends –
 Projects where a Session ran after the last commit and left changes behind – then the GitHub Issues
-ready to Start, and resumes or starts one in a click. Tauri v2 bridge in Rust, Vite + React window. Linux first.
+ready to Start, and resumes or starts one in a click. Tauri v2 bridge in Rust, Vite + React window. Linux and Windows.
 
 ## Start here
 
@@ -55,8 +55,8 @@ Undrift watches someone's own work, so the bridge is a read-only observer:
 - shadcn components in `src/components/ui/` are the project's library: keep them exactly as
   generated, even when nothing imports them yet. Restyle them through the tokens or a wrapper
   (`Action` over `Button`), never by editing them.
-- Platform code sits behind `#[cfg(target_os = "linux")]`, with a `not(linux)` fallback where
-  the rest of the app needs one.
+- Platform code sits behind `#[cfg(target_os = "linux")]` and `#[cfg(target_os = "windows")]`,
+  with a fallback for the others where the rest of the app needs one.
 - Comments say why, in full sentences.
 - Everything written is English, with an en dash (–) for asides.
 - Commits follow Conventional Commits (`feat:`, `fix:`, `style:`, `docs:`, `chore:`). Agents

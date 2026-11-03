@@ -1,5 +1,5 @@
 //! Opens a terminal running `claude` (AGENTS.md § Privacy contract: the only processes Undrift
-//! starts): `--resume <id>` in a Session's folder for Resume, plain `claude` in a Project folder for
+//! starts) – the user's terminal on Linux, Windows Terminal or a console window on Windows: `--resume <id>` in a Session's folder for Resume, plain `claude` in a Project folder for
 //! New Session, or an Issue as the first prompt in a Project folder for Start.
 
 /// The first prompt Start gives a Session: the implement skill fetches the Issue itself, from the
@@ -102,10 +102,47 @@ mod linux {
     }
 }
 
+#[cfg(target_os = "windows")]
+mod windows {
+    use std::os::windows::process::CommandExt;
+    use std::path::Path;
+    use std::process::{Child, Command};
+
+    /// The creation flag that gives a console program a window of its own.
+    const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
+
+    pub fn open(cwd: &str, claude_args: &[&str]) -> Result<(), String> {
+        if !Path::new(cwd).is_dir() {
+            return Err(format!("{cwd} is not a folder"));
+        }
+        // Windows Terminal, when it is there, opens a new window in the folder running `claude`.
+        // It splits its command line on `;`, which neither a session id nor a Start prompt holds.
+        // Without it, `claude` gets a console window of its own.
+        let child = Command::new("wt.exe")
+            .args(["-w", "new", "-d", cwd, "claude"])
+            .args(claude_args)
+            .spawn()
+            .or_else(|_| Command::new("claude").args(claude_args).current_dir(cwd).creation_flags(CREATE_NEW_CONSOLE).spawn())
+            .map_err(|e| format!("claude: {e}"))?;
+        reap(child);
+        Ok(())
+    }
+
+    /// Waited for whenever it ends, so the handle is released with the window.
+    fn reap(mut child: Child) {
+        std::thread::spawn(move || {
+            let _ = child.wait();
+        });
+    }
+}
+
 #[cfg(target_os = "linux")]
 use linux::open;
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "windows")]
+use windows::open;
+
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 fn open(_cwd: &str, _claude_args: &[&str]) -> Result<(), String> {
-    Err("opening a terminal is only built for Linux".into())
+    Err("opening a terminal is only built for Linux and Windows".into())
 }
