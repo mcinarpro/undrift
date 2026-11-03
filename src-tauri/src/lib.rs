@@ -19,19 +19,25 @@ fn project(shared: &bridge::Shared, path: &str) -> Result<bridge::Project, Strin
     latest.projects.iter().flatten().find(|p| p.path == path).cloned().ok_or_else(|| format!("not a Project: {path}"))
 }
 
+/// The terminal `config.json` names, read fresh at each click: the file is small and a click is
+/// rare, so the bridge keeps no copy of it for the commands.
+fn terminal_setting() -> String {
+    bridge::config::Settings::new().config().terminal.clone()
+}
+
 /// Resume: a terminal in the Session's folder running `claude --resume <id>`.
 #[tauri::command]
 async fn resume(shared: tauri::State<'_, bridge::Shared>, path: String, id: String) -> Result<(), String> {
     let project = project(&shared, &path)?;
     let session = project.sessions.iter().find(|s| s.id == id).ok_or("not a Session of this Project")?;
-    terminal::resume(&session.cwd, &session.id)
+    terminal::resume(&session.cwd, &terminal_setting(), &session.id)
 }
 
 /// New Session: a terminal in the Project's folder running `claude` with no prompt.
 #[tauri::command]
 async fn new_session(shared: tauri::State<'_, bridge::Shared>, path: String) -> Result<(), String> {
     let project = project(&shared, &path)?;
-    terminal::new_session(&project.path)
+    terminal::new_session(&project.path, &terminal_setting())
 }
 
 /// Start: a terminal in the Project's folder running `claude` with the Issue as its first prompt.
@@ -45,7 +51,7 @@ async fn start(shared: tauri::State<'_, bridge::Shared>, path: String, number: u
     if issue.blocked_by > 0 {
         return Err(format!("#{number} is blocked by an open Issue"));
     }
-    terminal::start(&project.path, number)
+    terminal::start(&project.path, &terminal_setting(), number)
 }
 
 /// Let Go: takes the Loose End off Home until the Project's next Activity. The next tick rereads

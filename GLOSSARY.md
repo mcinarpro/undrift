@@ -49,7 +49,7 @@ _Avoid_: Inbox, notifications, attention, alerts
 **Loose End**:
 A Project whose git repository holds work not yet committed or not yet pushed, and whose last
 Session is more recent than its last commit – whoever made the changes. A folder that is not a git
-repository is never one.
+repository is never one, nor is a repository with no commit yet.
 _Avoid_: Unfinished, pending, WIP, dirty repo
 
 **Graph**:

@@ -378,8 +378,9 @@ fn loose_end(read: Option<&RepoRead>, last_session: Option<&str>, last_activity:
     let Some(read) = read else { return false };
     let Some(session) = last_session.and_then(instant) else { return false };
     let left_work = read.repo.changed > 0 || read.repo.unpushed.is_some_and(|n| n > 0);
-    // A repo with no commit yet has nothing to be more recent than.
-    let after_commit = read.last_commit_at.as_deref().and_then(instant).is_none_or(|c| session > c);
+    // A repo with no commit yet has no last commit for a Session to be more recent than, so it is
+    // never a Loose End: there is no finished work it was left behind from.
+    let after_commit = read.last_commit_at.as_deref().and_then(instant).is_some_and(|c| session > c);
     left_work && after_commit && !let_go.is_some_and(|g| let_go_holds(g, last_activity))
 }
 
@@ -589,8 +590,8 @@ mod tests {
     }
 
     #[test]
-    fn a_repo_with_no_commit_yet_is_one_once_a_session_ran() {
-        assert!(loose_end(Some(&read(3, None, None)), Some(LATER), Some(LATER), None));
+    fn a_repo_with_no_commit_yet_is_never_one() {
+        assert!(!loose_end(Some(&read(3, None, None)), Some(LATER), Some(LATER), None));
         assert!(!loose_end(Some(&read(3, None, None)), None, None, None));
     }
 

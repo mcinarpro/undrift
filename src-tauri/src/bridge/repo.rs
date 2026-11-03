@@ -74,7 +74,9 @@ pub struct RepoRead {
 
 /// `None` when the folder is not a git checkout.
 pub fn read(cwd: &Path) -> Option<RepoRead> {
-    let branch = git(cwd, &["rev-parse", "--abbrev-ref", "HEAD"])?.trim().to_owned();
+    // `symbolic-ref` names the branch even before its first commit, where `rev-parse` only says
+    // `HEAD`; it fails on a detached HEAD, which `rev-parse` then names as such.
+    let branch = git(cwd, &["symbolic-ref", "--short", "-q", "HEAD"]).or_else(|| git(cwd, &["rev-parse", "--abbrev-ref", "HEAD"]))?.trim().to_owned();
     // A repo with no commit yet has a branch but no log, and it is still a repo.
     let (head_at, head_subject) = git(cwd, &["log", "-1", "--format=%cI%n%s"]).and_then(|o| parse_log(&o)).unzip();
     // `-uall` lists each file of an untracked folder, which plain `--porcelain` folds into one line.

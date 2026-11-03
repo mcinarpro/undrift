@@ -24,11 +24,14 @@ pub struct Config {
     pub focus: Vec<Focus>,
     /// The Areas, in the order their cards show. A Project sits in one Area at most.
     pub areas: Vec<Area>,
+    /// The terminal Resume, New Session and Start open; empty takes `$TERMINAL`, then the first
+    /// one found on the PATH. Linux only – Windows opens Windows Terminal.
+    pub terminal: String,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { roots: vec!["~/workspace".into()], hides: Vec::new(), focus: Vec::new(), areas: Vec::new() }
+        Config { roots: vec!["~/workspace".into()], hides: Vec::new(), focus: Vec::new(), areas: Vec::new(), terminal: String::new() }
     }
 }
 
@@ -208,6 +211,7 @@ mod tests {
         let config: Config = serde_json::from_str(r#"{"hides":["/x"]}"#).unwrap();
         assert_eq!(config.roots, vec!["~/workspace".to_string()]);
         assert_eq!(config.hides, vec!["/x".to_string()]);
+        assert_eq!(config.terminal, "");
     }
 
     fn temp(name: &str) -> PathBuf {

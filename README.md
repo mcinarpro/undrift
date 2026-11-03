@@ -36,8 +36,9 @@ look wrong without their reason are in [docs/adr/](docs/adr/).
 | `gh issue list`, `gh repo view`, `gh api user` | the open Issues, the repository's description, the account and its avatar |
 
 Projects are discovered: every git root directly under `~/workspace`, plus every folder a Session
-ran in. Undrift's own state lives in `~/.config/undrift/config.json` (roots, Hides, Focus, Areas)
-and `~/.local/share/undrift/` (the transcript cache, the Let Gos, the avatar).
+ran in. Undrift's own state lives in `~/.config/undrift/config.json` (roots, Hides, Focus, Areas,
+and `terminal`, the terminal to open on Linux – empty takes `$TERMINAL`, then the first one on the
+PATH) and `~/.local/share/undrift/` (the transcript cache, the Let Gos, the avatar).
 
 ## What it starts
 

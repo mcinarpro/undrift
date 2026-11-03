@@ -1,6 +1,8 @@
 //! Opens a terminal running `claude` (AGENTS.md § Privacy contract: the only processes Undrift
-//! starts) – the user's terminal on Linux, Windows Terminal or a console window on Windows: `--resume <id>` in a Session's folder for Resume, plain `claude` in a Project folder for
-//! New Session, or an Issue as the first prompt in a Project folder for Start.
+//! starts) – on Linux the terminal `config.json` names, else `$TERMINAL`, else the first one on
+//! the PATH; Windows Terminal or a console window on Windows: `--resume <id>` in a Session's
+//! folder for Resume, plain `claude` in a Project folder for New Session, or an Issue as the first
+//! prompt in a Project folder for Start.
 
 /// The first prompt Start gives a Session: the implement skill fetches the Issue itself, from the
 /// repository of the folder it runs in.
@@ -8,21 +10,21 @@ pub fn start_prompt(issue: u32) -> String {
     format!("/mattpocock-skills:implement #{issue}")
 }
 
-pub fn resume(cwd: &str, session_id: &str) -> Result<(), String> {
+pub fn resume(cwd: &str, terminal: &str, session_id: &str) -> Result<(), String> {
     // The id reaches `claude` as an argument, never through the shell, but anything other than a
     // session id has no business there.
     if session_id.is_empty() || !session_id.chars().all(|c| c.is_ascii_hexdigit() || c == '-') {
         return Err("not a session id".into());
     }
-    open(cwd, &["--resume", session_id])
+    open(cwd, terminal, &["--resume", session_id])
 }
 
-pub fn new_session(cwd: &str) -> Result<(), String> {
-    open(cwd, &[])
+pub fn new_session(cwd: &str, terminal: &str) -> Result<(), String> {
+    open(cwd, terminal, &[])
 }
 
-pub fn start(cwd: &str, issue: u32) -> Result<(), String> {
-    open(cwd, &[&start_prompt(issue)])
+pub fn start(cwd: &str, terminal: &str, issue: u32) -> Result<(), String> {
+    open(cwd, terminal, &[&start_prompt(issue)])
 }
 
 #[cfg(target_os = "linux")]
@@ -54,11 +56,11 @@ mod linux {
     /// A terminal named by `$TERMINAL` that is not in the list gets no folder flag and the common `-e`.
     const UNKNOWN: Known = Known { name: "", workdir: "", exec: "-e" };
 
-    pub fn open(cwd: &str, claude_args: &[&str]) -> Result<(), String> {
+    pub fn open(cwd: &str, terminal: &str, claude_args: &[&str]) -> Result<(), String> {
         if !Path::new(cwd).is_dir() {
             return Err(format!("{cwd} is not a folder"));
         }
-        let (program, known) = pick()?;
+        let (program, known) = pick(terminal)?;
         let mut cmd = Command::new(&program);
         cmd.current_dir(cwd);
         match known.workdir {
@@ -84,9 +86,11 @@ mod linux {
         Ok(())
     }
 
-    /// `$TERMINAL`, else the first terminal on the PATH.
-    fn pick() -> Result<(String, &'static Known), String> {
-        if let Some(wanted) = std::env::var("TERMINAL").ok().filter(|t| !t.trim().is_empty()) {
+    /// The terminal `config.json` names, else `$TERMINAL`, else the first terminal on the PATH. A
+    /// named one – a name or a path – must be found, since naming it says the list is wrong.
+    fn pick(wanted: &str) -> Result<(String, &'static Known), String> {
+        let wanted = Some(wanted.trim().to_owned()).filter(|t| !t.is_empty()).or_else(|| std::env::var("TERMINAL").ok().filter(|t| !t.trim().is_empty()));
+        if let Some(wanted) = wanted {
             let name = Path::new(&wanted).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
             let known = TERMINALS.iter().find(|k| k.name == name).unwrap_or(&UNKNOWN);
             return if on_path(&wanted) { Ok((wanted, known)) } else { Err(format!("terminal not found: {wanted}")) };
@@ -111,7 +115,8 @@ mod windows {
     /// The creation flag that gives a console program a window of its own.
     const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
 
-    pub fn open(cwd: &str, claude_args: &[&str]) -> Result<(), String> {
+    /// The terminal `config.json` names is a Linux setting: here Windows Terminal is the one tried.
+    pub fn open(cwd: &str, _terminal: &str, claude_args: &[&str]) -> Result<(), String> {
         if !Path::new(cwd).is_dir() {
             return Err(format!("{cwd} is not a folder"));
         }
@@ -143,6 +148,6 @@ use linux::open;
 use windows::open;
 
 #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-fn open(_cwd: &str, _claude_args: &[&str]) -> Result<(), String> {
+fn open(_cwd: &str, _terminal: &str, _claude_args: &[&str]) -> Result<(), String> {
     Err("opening a terminal is only built for Linux and Windows".into())
 }
