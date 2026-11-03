@@ -3,7 +3,7 @@ import * as bridge from "@/bridge";
 import { savedTheme, setTheme, type ThemeChoice } from "@/lib/theme";
 import type { NavUser } from "@/types";
 
-/** The pages the sidebar leads to; #3 and #4 fill them. */
+/** The pages the header leads to. */
 export type Page = "home" | "projects" | "graph" | "settings";
 
 type State = {

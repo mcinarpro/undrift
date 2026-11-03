@@ -1,5 +1,7 @@
 import {
   ChevronsUpDown,
+  Bot,
+  Ellipsis,
   ExternalLink,
   Folders,
   House,
@@ -29,7 +31,6 @@ const ICONS = {
   dark: Moon,
   profile: ExternalLink,
   quit: LogOut,
-  switch: ChevronsUpDown,
   minimize: Minus,
   maximize: Square,
   close: X,

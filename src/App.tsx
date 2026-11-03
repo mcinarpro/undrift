@@ -1,8 +1,7 @@
 import { useEffect } from "react";
 import { Find } from "@/components/find";
-import { Sidebar } from "@/components/sidebar";
-import { Topbar } from "@/components/topbar";
-import { Placeholder, TITLES } from "@/pages/placeholder";
+import { Header } from "@/components/topbar";
+import { Placeholder } from "@/pages/placeholder";
 import { useStore } from "@/store";
 
 // Only text entry swallows the shortcuts: a focused radio or button takes no letters, so F and
@@ -33,14 +32,11 @@ export default function App() {
   }, [setFindOpen, quit]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar />
-      <div className="flex min-w-0 grow flex-col">
-        <Topbar title={TITLES[page]} />
-        <main className="min-h-0 grow overflow-y-auto">
-          <Placeholder page={page} />
-        </main>
-      </div>
+    <div className="flex h-screen flex-col overflow-hidden bg-background">
+      <Header />
+      <main key={page} className="min-h-0 grow overflow-y-auto">
+        <Placeholder page={page} />
+      </main>
       <Find />
     </div>
   );

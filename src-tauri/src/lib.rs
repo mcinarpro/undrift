@@ -20,7 +20,7 @@ async fn rescan(shared: tauri::State<'_, bridge::Shared>) -> Result<(), ()> {
     Ok(())
 }
 
-/// The NavUser from the cache, so the sidebar has it before `gh` answers; the `user` event follows.
+/// The NavUser from the cache, so the header has it before `gh` answers; the `user` event follows.
 #[tauri::command]
 async fn nav_user() -> Option<bridge::user::NavUser> {
     bridge::user::cached()

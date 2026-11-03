@@ -8,7 +8,7 @@ const CONTROLS: { icon: IconName; label: string; run: () => Promise<void> }[] = 
   { icon: "close", label: "Close", run: closeWindow },
 ];
 
-// The window has no native decorations (tauri.conf.json), so the top bar draws its own buttons.
+// The window has no native decorations (tauri.conf.json), so the header draws its own buttons.
 // A plain browser has no window to drive.
 export function WindowControls() {
   if (!inTauri) return null;

@@ -1,6 +1,6 @@
 import type { Page } from "@/store";
 
-export const TITLES: Record<Page, string> = { home: "Home", projects: "Projects", graph: "Graph", settings: "Settings" };
+const TITLES: Record<Page, string> = { home: "Home", projects: "Projects", graph: "Graph", settings: "Settings" };
 
 // The pages the shell leads to, each with only its h1 until #3 and #4 fill them. The Graph's title
 // is the top bar's alone, so its h1 is for screen readers (DESIGN.md § Type).

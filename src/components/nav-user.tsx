@@ -34,26 +34,36 @@ function Avatar({ src, login }: { src: string | null; login: string | undefined 
   );
 }
 
-// shadcn's nav-user block: who you are at the foot of the sidebar, and the quiet things in its menu.
+// shadcn's nav-user block as the avatar at the header's right end, where GitHub and Vercel put the
+// account and people look for it: who you are heads its menu, then the quiet things.
 export function NavUser() {
   const { user, avatar, go, theme, setTheme, quit } = useStore();
   // Without a cached user – `gh` signed out, missing, or not answered yet – the menu stays, since
   // Settings, the theme and Quit do not depend on the account.
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex h-12 w-full items-center gap-2.5 rounded-md px-2 text-left transition-colors duration-150 hover:bg-alpha-100">
+      {/* The ring on hover replaces the base focus ring, so the trigger draws the double ring itself. */}
+      <DropdownMenuTrigger
+        aria-label={user ? `Account – ${user.name}` : "Account – Not signed in"}
+        className="flex size-8 items-center justify-center rounded-full transition-shadow duration-150 hover:shadow-[0_0_0_4px_var(--ud-alpha-100)] focus-visible:shadow-[0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--ud-focus)]"
+      >
         <Avatar src={avatar} login={user?.login} />
-        {user ? (
-          <span className="flex min-w-0 grow flex-col">
-            <span className="truncate type-label-14 font-medium">{user.name}</span>
-            <span className="truncate type-label-13 text-muted-foreground">@{user.login}</span>
-          </span>
-        ) : (
-          <span className="grow truncate type-label-14 text-text-2">Not signed in</span>
-        )}
-        <Icon name="switch" size={14} className="text-muted-foreground" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" className="rounded-xl p-1 ring-0 shadow-(--ud-shadow-menu)">
+      {/* The trigger is 32 px wide, so the menu takes its own width rather than the anchor's. */}
+      <DropdownMenuContent side="bottom" align="end" className="w-60 rounded-xl p-1 ring-0 shadow-(--ud-shadow-menu)">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="flex flex-col px-2 py-1.5">
+            {user ? (
+              <>
+                <span className="truncate type-label-14 font-medium text-foreground">{user.name}</span>
+                <span className="truncate type-label-13 font-normal text-muted-foreground">@{user.login}</span>
+              </>
+            ) : (
+              <span className="truncate type-label-14 font-normal text-text-2">Not signed in</span>
+            )}
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator className="my-1" />
         {user && (
           <DropdownMenuItem onClick={() => openExternal(user.profileUrl).catch((e) => console.error("open profile:", e))} className={ROW}>
             <Icon name="profile" className="text-muted-foreground" />

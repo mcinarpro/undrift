@@ -87,7 +87,7 @@ export type Project = {
   issues: Issue[];
 };
 
-/** The GitHub account `gh` is signed in to, shown at the foot of the sidebar. */
+/** The GitHub account `gh` is signed in to, shown as the avatar at the end of the header. */
 export type NavUser = {
   login: string;
   /** The profile's name, or the login when the profile has none. */

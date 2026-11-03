@@ -1,5 +1,5 @@
 //! The NavUser: the GitHub account `gh` is signed in to, read with `gh api user`, and its avatar,
-//! fetched once per avatar URL. Both are cached in `~/.local/share/undrift/` so the sidebar shows
+//! fetched once per avatar URL. Both are cached in `~/.local/share/undrift/` so the header shows
 //! them offline and on the first paint.
 
 use super::{data_dir, gh, write_atomic};
@@ -82,7 +82,7 @@ fn parse(json: &str) -> Option<(NavUser, String)> {
     Some((NavUser { login: u.login, name, profile_url: u.html_url }, u.avatar_url))
 }
 
-/// GitHub's avatar URL with the size the sidebar needs; `None` for any other host.
+/// GitHub's avatar URL with the size the header needs; `None` for any other host.
 fn avatar_request(url: &str) -> Option<String> {
     url.starts_with(AVATAR_HOST).then(|| {
         let sep = if url.contains('?') { '&' } else { '?' };

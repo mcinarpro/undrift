@@ -28,7 +28,7 @@ const action = cva(
         secondary:
           "bg-card text-foreground shadow-[0_0_0_1px_var(--ud-line)] hover:bg-secondary focus-visible:shadow-[0_0_0_1px_var(--ud-line),0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--ud-focus)]",
         // The ! is needed because the generated dark:hover:bg-muted/50 survives cn and would win,
-        // leaving a hover that cannot be seen on the black top bar.
+        // leaving a hover that cannot be seen on the black page.
         tertiary: "hover:bg-alpha-200! focus-visible:shadow-[0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--ud-focus)]",
         // Geist's error button, for the one action that erases something: red-800 with white text.
         // The hover darkens the fill instead of taking red-900, which is lighter in dark and would
