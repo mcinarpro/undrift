@@ -43,6 +43,7 @@ fn quit(app: AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_window_state::Builder::new().build())
         .invoke_handler(tauri::generate_handler![projects_now, rescan, nav_user, nav_user_avatar, quit])
         .setup(|app| {
             bridge::start(app.handle().clone());
