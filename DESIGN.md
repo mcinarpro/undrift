@@ -100,7 +100,8 @@ window. A view is described here once it is built; until then this section holds
   **Open on GitHub** when the repository is on GitHub. The name truncates first, so the actions
   never wrap under it. Under that line, the GitHub repository's description in `type-copy-14`
   `text-2` when it has one. Then a **Where You Left Off** card, with no button – the Drift strip,
-  Drift, Last Activity, Area, Last Session with its Status when open, the diff stat, Last Prompt;
+  Drift, Last Activity, Area, Last Session with its Status when open, the diff stat, Reads First
+  as a size with the files counted in its tooltip, Last Prompt;
   then two columns from 1280 px: **Sessions Open** while a Session is open – a row each, the
   Session's title, its Status, since when and *terminal* or *desktop*, and no button, since it runs
   in its own window – the Project's Issues (each with Start) and Earlier Sessions (each with

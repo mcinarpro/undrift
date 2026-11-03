@@ -8,6 +8,7 @@ mod gh;
 pub mod history;
 pub mod issues;
 pub mod let_go;
+pub mod reads_first;
 pub mod repo;
 pub mod sessions;
 pub mod transcripts;
@@ -17,6 +18,7 @@ use chrono::{DateTime, FixedOffset, Local};
 use config::{project_for, Config, Settings};
 use history::{Record, SessionMeta};
 use issues::Issue;
+use reads_first::ReadsFirst;
 use repo::{Repo, RepoRead};
 use serde::Serialize;
 use sessions::{Session, Status};
@@ -118,6 +120,8 @@ pub struct Project {
     pub issues: Vec<Issue>,
     /// Whether Home lists it (GLOSSARY.md § Loose End), Let Go already applied.
     pub loose_end: bool,
+    /// What every Session reads before its first prompt; `None` when the folder has nothing.
+    pub reads_first: Option<ReadsFirst>,
 }
 
 /// Which passes the list holds (src/types.ts `Read`). A pass counts once it finished after the one
@@ -246,6 +250,8 @@ struct Known {
     discovered: BTreeSet<PathBuf>,
     records: Vec<Record>,
     repos: HashMap<PathBuf, RepoRead>,
+    /// Read in the same pass as the repos, for the folders that have something to read.
+    reads_first: HashMap<PathBuf, ReadsFirst>,
     live: Vec<Session>,
     /// Open Issues by `owner/name`.
     issues: HashMap<String, Vec<Issue>>,
@@ -323,6 +329,7 @@ impl Known {
                     sessions: records.iter().take(MAX_SESSIONS).map(|r| view(r.cwd.clone(), &r.meta)).collect(),
                     issues,
                     loose_end,
+                    reads_first: self.reads_first.get(&path).cloned(),
                     path: path_text,
                 }
             })
@@ -406,7 +413,7 @@ fn run(app: AppHandle, shared: Shared) {
     let mut history_scan: Background<Vec<Record>> = Background::new();
     // Each pass hands back what it was asked to read, so a pass that started before a folder or a
     // repository was known never counts for it.
-    let mut repo_scan: Background<(BTreeSet<PathBuf>, HashMap<PathBuf, RepoRead>)> = Background::new();
+    let mut repo_scan: Background<(BTreeSet<PathBuf>, HashMap<PathBuf, RepoRead>, HashMap<PathBuf, ReadsFirst>)> = Background::new();
     let mut github_scan: Background<(BTreeSet<String>, Vec<GitHubRead>)> = Background::new();
     let mut github = BTreeSet::new();
     let mut paths_seen = BTreeSet::new();
@@ -456,11 +463,23 @@ fn run(app: AppHandle, shared: Shared) {
         }
         repo_scan.run(repo_due, asked && read.sessions, move || {
             let list: Vec<PathBuf> = paths.iter().cloned().collect();
-            let repos = in_parallel(&list, GIT_WORKERS, |p| repo::read(p)).into_iter().zip(list).filter_map(|(r, p)| Some((p, r?))).collect();
-            (paths, repos)
+            // One pass over the folders reads both git and Reads First, so they are as fresh as each other.
+            let found = in_parallel(&list, GIT_WORKERS, |p| (repo::read(p), reads_first::read(p)));
+            let mut repos = HashMap::new();
+            let mut reads = HashMap::new();
+            for ((repo, read), p) in found.into_iter().zip(list) {
+                if let Some(r) = repo {
+                    repos.insert(p.clone(), r);
+                }
+                if let Some(r) = read {
+                    reads.insert(p, r);
+                }
+            }
+            (paths, repos, reads)
         });
-        if let Some(((covered, repos), was_asked)) = repo_scan.poll() {
+        if let Some(((covered, repos, reads), was_asked)) = repo_scan.poll() {
             known.repos = repos;
+            known.reads_first = reads;
             repos_covered = covered;
             dirty = true;
             answer |= was_asked;

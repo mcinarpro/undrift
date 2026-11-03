@@ -74,6 +74,13 @@ export type Issue = {
   blockedBy: number;
 };
 
+/** Reads First: the size of what a Session loads at start, and the files counted. */
+export type ReadsFirst = {
+  bytes: number;
+  /** Paths relative to the Project; a skill says that only its frontmatter is counted. */
+  files: string[];
+};
+
 /** The Area a Project is filed under. */
 export type AreaRef = {
   name: string;
@@ -105,6 +112,8 @@ export type Project = {
   issues: Issue[];
   /** Whether Home lists it as a Loose End, Let Go already applied. */
   looseEnd: boolean;
+  /** What every Session reads before its first prompt; null when the folder has nothing. */
+  readsFirst: ReadsFirst | null;
 };
 
 /** Which of the bridge's passes the list holds. Until one is in, what it reads is not known, which

@@ -111,8 +111,22 @@ function WhereYouLeftOff({ project, now }: { project: ProjectData; now: Date }) 
               <span className="text-muted-foreground">Nothing left behind</span>
             )}
           </Field>
+          {/* Read in the git pass, so it waits in Skeletons with Changes. A folder with nothing to
+              read has no field: the size says what a Session carries, and nothing carries nothing. */}
+          {gitPhase !== "ready" ? (
+            <Field label="Reads First">{gitPhase === "skeleton" && <Bar className="h-4 w-16" />}</Field>
+          ) : (
+            project.readsFirst && (
+              <Field label="Reads First">
+                <Hint label={project.readsFirst.files.join(" · ")}>
+                  <span className="type-label-13-mono text-text-2 tabular-nums">{(project.readsFirst.bytes / 1000).toFixed(1)} kB</span>
+                </Hint>
+              </Field>
+            )
+          )}
           {last?.session.lastPrompt && (
-            <Field label="Last Prompt" className="col-span-3">
+            // Beside Reads First when there is one, else across the row, so no column is left empty.
+            <Field label="Last Prompt" className={gitPhase !== "ready" || project.readsFirst ? "col-span-2" : "col-span-3"}>
               <span className="line-clamp-3 type-copy-14 text-text-2">“{last.session.lastPrompt}”</span>
             </Field>
           )}

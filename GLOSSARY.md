@@ -107,6 +107,12 @@ _Avoid_: Archived, dead, dormant
 The 30-day view with one row per Project and one cell per day that had Activity.
 _Avoid_: Heatmap, timeline, calendar
 
+**Reads First**:
+What every Session in a Project loads before its first prompt – `CLAUDE.md`, `AGENTS.md`,
+`CLAUDE.local.md`, the rules under `.claude/rules/` with no `paths`, and the frontmatter of each
+skill – shown as a size on the Project page. A Project with nothing to read shows none.
+_Avoid_: Context, instructions, system prompt
+
 **Resume**:
 Reopening an earlier Session in a terminal, with `claude --resume`.
 _Avoid_: Restore, continue, reopen
