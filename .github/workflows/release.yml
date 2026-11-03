@@ -1,0 +1,52 @@
+name: Release
+
+# A tag vX.Y.Z builds the Linux bundles (.deb, .rpm, .AppImage) and attaches them to a draft
+# pre-release named after it. Mehmet reviews the draft and publishes it by hand.
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  linux:
+    name: Linux bundles
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: "☁️ Checkout repository"
+        uses: actions/checkout@v4
+
+      - name: "📦 Install Tauri's Linux packages"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev libxdo-dev patchelf
+
+      - name: "📦 Install bun"
+        uses: oven-sh/setup-bun@v2
+
+      - name: "🦀 Install Rust"
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: "🗃️ Cache Rust builds"
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: "📦 Install dependencies"
+        run: bun install --frozen-lockfile
+
+      - name: "🚀 Build and draft the release"
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tauriScript: bun tauri
+          tagName: ${{ github.ref_name }}
+          releaseName: "undrift ${{ github.ref_name }}"
+          releaseBody: "Linux builds. Install the .deb, or run the .AppImage."
+          releaseDraft: true
+          prerelease: true
