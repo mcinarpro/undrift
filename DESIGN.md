@@ -42,16 +42,16 @@ window. A view is described here once it is built; until then this section holds
   until the pointer is over the card, then in `text`. The page's `h1` greets the account by its
   first name (*Hello, Mehmet*), *Home* while there is none, 16 px above the band rather than the
   column's 32.
-  Above the sections, a bento band of four columns says what matters by size: the first Loose End
-  leaves its section for a 2×2 tile – its section and age, the Session title in `type-heading-24`,
+  Above the sections, a band of two 2×2 tiles on a four-column grid: the first Loose End leaves
+  its section for the left one – its section and age, the Session title in `type-heading-24`,
   three lines of prompt, the Drift strip, its five most changed files (mono path, `+n −n` or *new*),
   how many more and the last commit's subject, then the page's only primary Resume, the diff stat and
-  its Issue count. Four 1×1 figure tiles sit beside it – Loose Ends, Focus, Commits Not
-  Pushed, Sessions Open – each a `type-heading-32` number over its label, then where it comes from:
-  ranked 6 px bars in `accent`, one hue, largest first, each named and counted beside it, the tail
-  past four folded into Other; Focus lists its Projects in the order chosen, each bar the share of
-  days with Activity since, *5 of 9 d* beside it, and says *Nothing in Focus* when empty; Sessions
-  Open lists the Projects with their Status instead. The other cards take a
+  its Issue count – and **Focus** takes the right one: a row per Project in Focus, in the order
+  chosen, its 40 px Gauge, the 20 px avatar and the name (opens the page) in `type-label-14`, then
+  *5 of 9 days with Activity · since 1 Nov* in `muted`; *Nothing in Focus. Choose up to three on a
+  Project page.* when empty. No figure tiles: the counts live in the line under the greeting –
+  *3 Loose Ends – 1 from last night · 16 commits not pushed · 2 Sessions open.*, each part only
+  above zero. The other cards take a
   secondary Resume. Under them, Ready to Start: a card per Project – its Issues newest first, each `#N`,
   title and a tertiary Start on a row that takes `alpha-100` on hover – three per card until Show All, the Projects ordered by their newest
   Issue. With no Loose End, Geist's Empty State says *Nothing left half-done.* above the five

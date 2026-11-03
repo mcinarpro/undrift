@@ -1,10 +1,10 @@
 import { useState, type ReactNode } from "react";
 import { Action } from "@/components/action";
-import { Activity, AreaName, AreaSwatch, DEFAULT_BRANCHES, Diff, Empty, Hint, LIVE_BADGE, ProjectAvatar, STATUS_DOT, useNow, When } from "@/components/bits";
+import { Activity, AreaName, DEFAULT_BRANCHES, Diff, Empty, Gauge, Hint, LIVE_BADGE, ProjectAvatar, STATUS_DOT, useNow, When } from "@/components/bits";
 import { Icon } from "@/components/icon";
 import { Bar, useProjectsRead, useSkeleton } from "@/components/loading";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { fileLines, figures, issuesByProject, looseEnds, needsYou, status, touchedLast, type FocusPart, type LooseEnd, type NeedRow, type OpenPart, type Part, type Section as SectionName } from "@/lib/home";
+import { fileLines, focusRows, headline, issuesByProject, looseEnds, needsYou, status, touchedLast, type FocusPart, type LooseEnd, type NeedRow, type Section as SectionName } from "@/lib/home";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store";
 import type { Issue, Project } from "@/types";
@@ -192,87 +192,35 @@ function Hero({ le, section, now }: { le: LooseEnd; section: SectionName; now: D
   );
 }
 
-/** A figure beside the big tile: the number large, what it counts under it, then where it comes
- * from. A large standalone number keeps proportional figures; the column of parts aligns with
- * tabular ones (dataviz § Figures). */
-function FigureTile({ label, total, children }: { label: string; total: number; children: ReactNode }) {
+/** Focus as the band's second 2×2 tile (DESIGN.md § Layout): a row per Project in Focus, in the
+ * order chosen, with the Project page's Gauge – the days with Activity since the choice. A name
+ * opens the page. Nothing else: the tile sums up the intention, as the Hero sums up what was left. */
+function FocusTile({ focus }: { focus: FocusPart[] }) {
   return (
-    // A container, so its parts fit the tile's own width: beside a right column a tile is narrower
-    // than the window alone would say.
-    <section className={cn(TILE, "@container gap-4")}>
-      <div className="flex flex-col gap-1">
-        <span className="type-heading-32">{total.toLocaleString("en-GB")}</span>
-        <h2 className="type-label-13 text-muted-foreground">{label}</h2>
-      </div>
-      <div className="mt-auto">{children}</div>
+    <section className={cn(TILE, "col-span-2 row-span-2 gap-4 p-6")}>
+      <h2 className="type-label-14 font-medium">Focus</h2>
+      {focus.length === 0 ? (
+        <p className="type-label-13 text-muted-foreground">Nothing in Focus. Choose up to three on a Project page.</p>
+      ) : (
+        <ul className="flex flex-col gap-4">
+          {focus.map((f) => (
+            <li key={f.project.path} className="flex min-w-0 items-center gap-4">
+              <Gauge value={f.active} max={f.days} label={`${f.active} of ${f.days} days with Activity`} />
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <span className="flex min-w-0 items-center gap-2 type-label-14 font-medium">
+                  <ProjectAvatar name={f.project.name} color={f.project.area?.color} size={20} />
+                  <ProjectLink project={f.project} />
+                </span>
+                <span className="type-label-13 text-muted-foreground tabular-nums">
+                  {f.active} of {f.days} {f.days === 1 ? "day" : "days"} with Activity · since{" "}
+                  {new Date(f.project.focusSince!).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
-  );
-}
-
-/** Ranked horizontal bars, one hue, largest first (dataviz: parts compared with each other). Each
- * part is named and counted in text beside its bar, so the bar is decoration for sighted readers. */
-function Parts({ parts }: { parts: Part[] }) {
-  const max = Math.max(...parts.map((p) => p.value), 1);
-  return (
-    <ul className="flex flex-col gap-2">
-      {parts.map((p) => (
-        // In a narrow tile the names give up width before the bars do, or a bar shrinks to a dot.
-        <li key={p.label} className="grid grid-cols-[minmax(0,4.5rem)_minmax(0,1fr)_auto] items-center gap-2 @min-[14rem]:grid-cols-[minmax(0,7rem)_minmax(0,1fr)_auto] @min-[14rem]:gap-3">
-          <span className="flex min-w-0 items-center gap-1.5 type-label-13 text-text-2">
-            {p.color !== undefined && <AreaSwatch color={p.color ?? undefined} className="size-2" />}
-            <span className="truncate">{p.label}</span>
-          </span>
-          {/* A 6 px bar from the left baseline, its data end rounded 4 px (dataviz § Marks). */}
-          <span aria-hidden="true" className="h-1.5">
-            <span className="block h-full rounded-r-[4px] bg-mark" style={{ width: `${(p.value / max) * 100}%` }} />
-          </span>
-          <span className="type-label-13 text-text-2 tabular-nums">{p.value.toLocaleString("en-GB")}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/** The Projects in Focus, in the order chosen, each with its share of days with Activity since –
- * the same row as the ranked Parts, so the band reads as one. A name opens the Project page. */
-function FocusParts({ focus }: { focus: FocusPart[] }) {
-  if (focus.length === 0) return <p className="type-label-13 text-muted-foreground">Nothing in Focus. Choose up to three on a Project page.</p>;
-  return (
-    <ul className="flex flex-col gap-2">
-      {focus.map((f) => (
-        <li key={f.project.path} className="grid grid-cols-[minmax(0,4.5rem)_minmax(0,1fr)_auto] items-center gap-2 @min-[14rem]:grid-cols-[minmax(0,7rem)_minmax(0,1fr)_auto] @min-[14rem]:gap-3">
-          <span className="flex min-w-0 items-center gap-1.5 type-label-13 text-text-2">
-            <AreaSwatch color={f.project.area?.color} className="size-2" />
-            <ProjectLink project={f.project} />
-          </span>
-          <span aria-hidden="true" className="h-1.5">
-            <span className="block h-full rounded-r-[4px] bg-mark" style={{ width: `${(f.active / f.days) * 100}%` }} />
-          </span>
-          <span className="type-label-13 text-text-2 tabular-nums">
-            {f.active} of {f.days} d
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/** The Sessions open now, each with its Status as the cards show it. */
-function OpenSessions({ open }: { open: OpenPart[] }) {
-  if (open.length === 0) return <p className="type-label-13 text-muted-foreground">No Session runs right now.</p>;
-  const shown = open.slice(0, 4);
-  return (
-    <ul className="flex flex-col gap-2">
-      {shown.map((o, i) => (
-        <li key={i} className="flex min-w-0 items-center gap-1.5 type-label-13">
-          <AreaSwatch color={o.color} className="size-2" />
-          <span className="grow truncate text-text-2">{o.label}</span>
-          <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[o.status])} />
-          <span className="text-text-2">{o.status}</span>
-        </li>
-      ))}
-      {open.length > shown.length && <li className="type-label-13 text-muted-foreground">{open.length - shown.length} more</li>}
-    </ul>
   );
 }
 
@@ -467,7 +415,7 @@ function NothingLeft({ projects, now }: { projects: Project[]; now: Date }) {
   );
 }
 
-/** Home in Skeletons while the Loose Ends are read: the band – the big tile and the four figures –
+/** Home in Skeletons while the Loose Ends are read: the band – the big tile and the Focus tile –
  * then a section of cards, so the page keeps its shape when they come in. */
 function HomeSkeleton() {
   return (
@@ -479,13 +427,18 @@ function HomeSkeleton() {
           <Bar className="h-4 w-2/3" />
           <Bar className="mt-auto h-8 w-24" />
         </div>
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className={cn(TILE, "gap-4")}>
-            <Bar className="h-8 w-16" />
-            <Bar className="h-3 w-24" />
-            <Bar className="mt-auto h-12 w-full" />
-          </div>
-        ))}
+        <div className={cn(TILE, "col-span-2 row-span-2 gap-4 p-6")}>
+          <Bar className="h-4 w-16" />
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex items-center gap-4">
+              <Bar className="size-10 rounded-full" />
+              <div className="flex grow flex-col gap-1.5">
+                <Bar className="h-4 w-1/3" />
+                <Bar className="h-3 w-1/2" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
       <section className="flex flex-col gap-3">
         <Bar className="h-4 w-24" />
@@ -543,7 +496,17 @@ export function Home() {
   // its section; a section it empties is not drawn.
   const hero = groups[0]?.items[0];
   const rest = groups.map((g) => ({ ...g, items: g.items.filter((le) => le !== hero) })).filter((g) => g.items.length > 0);
-  const fig = projects && figures(groups, projects, now);
+  const focus = projects ? focusRows(projects, now) : [];
+  const counts = projects ? headline(projects, groups) : { unpushed: 0, open: 0 };
+  // The greeting's line: the Loose Ends, then the counts that matter beside them, each only above
+  // zero – a figure at zero says nothing worth a word.
+  const line = [
+    `${total} Loose ${total === 1 ? "End" : "Ends"}${night > 0 ? ` – ${night} from last night` : ""}`,
+    counts.unpushed > 0 && `${counts.unpushed} ${counts.unpushed === 1 ? "commit" : "commits"} not pushed`,
+    counts.open > 0 && `${counts.open} ${counts.open === 1 ? "Session" : "Sessions"} open`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const issues = projects && issuesPhase === "ready" ? issuesByProject(projects) : [];
   const needs = projects ? needsYou(projects, now) : { waiting: [], busy: [], quiet: [] };
   const needed = needs.waiting.length + needs.busy.length + needs.quiet.length > 0;
@@ -561,33 +524,17 @@ export function Home() {
         {/* The column keeps 32 px between its parts; the greeting sits closer to what it introduces. */}
         <header className="-mb-4 flex flex-col gap-1">
           <h1 className="type-heading-24">{firstName ? `Hello, ${firstName}` : "Home"}</h1>
-          {projects && total > 0 && (
-            <p className="type-copy-14 text-text-2">
-              {total} Loose {total === 1 ? "End" : "Ends"}
-              {night > 0 && ` – ${night} from last night`}.
-            </p>
-          )}
+          {projects && total > 0 && <p className="type-copy-14 text-text-2">{line}.</p>}
         </header>
         {loosePhase === "skeleton" && <HomeSkeleton />}
         {projects &&
-          (!hero || !fig ? (
+          (!hero ? (
             <NothingLeft projects={projects} now={now} />
           ) : (
             <>
               <div className="grid grid-cols-4 gap-4">
                 <Hero le={hero} section={groups[0].section} now={now} />
-                <FigureTile label="Loose Ends" total={fig.looseEnds.total}>
-                  <Parts parts={fig.looseEnds.parts} />
-                </FigureTile>
-                <FigureTile label="Focus" total={fig.focus.length}>
-                  <FocusParts focus={fig.focus} />
-                </FigureTile>
-                <FigureTile label="Commits Not Pushed" total={fig.unpushed.total}>
-                  <Parts parts={fig.unpushed.parts} />
-                </FigureTile>
-                <FigureTile label="Sessions Open" total={fig.open.length}>
-                  <OpenSessions open={fig.open} />
-                </FigureTile>
+                <FocusTile focus={focus} />
               </div>
               {rest.map((g) => (
                 <Section key={g.section} title={g.section} count={g.items.length}>

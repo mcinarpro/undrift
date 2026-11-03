@@ -52,58 +52,27 @@ export function looseEnds(projects: Project[], now: Date): { section: Section; i
   })).filter((g) => g.items.length > 0);
 }
 
-/** One part of a figure: what it counts for, and how much. A Project's part carries its Area colour,
- * `null` when it is Unsorted; a section's carries none. */
-export type Part = { label: string; value: number; color?: string | null };
-
-/** A figure tile: its total, and the parts it splits into, largest first. */
-export type Figure = { total: number; parts: Part[] };
-
-/** Parts shown per figure: past four, the smallest fold into "Other" (dataviz: fold the tail,
- * never a fifth row the tile has no room for). Parts at zero draw nothing. */
-const MAX_PARTS = 4;
-
-function ranked(parts: Part[]): Figure {
-  const sorted = parts.filter((p) => p.value > 0).sort((a, b) => b.value - a.value);
-  const total = sorted.reduce((n, p) => n + p.value, 0);
-  if (sorted.length <= MAX_PARTS) return { total, parts: sorted };
-  const kept = sorted.slice(0, MAX_PARTS - 1);
-  const other = sorted.slice(MAX_PARTS - 1).reduce((n, p) => n + p.value, 0);
-  return { total, parts: [...kept, { label: "Other", value: other }] };
-}
-
-/** An open Session as the Sessions Open tile lists it. */
-export type OpenPart = { label: string; color?: string; status: StatusName };
-
 /** A Project in Focus as the Focus tile lists it: the days since it was chosen, and how many of
  * them had Activity (GLOSSARY.md § Focus). */
 export type FocusPart = { project: Project; days: number; active: number };
 
-/** The figures beside the big tile, each split by where it comes from, so a number says where as
- * well as how many: the Loose Ends by section, the Focus in the order chosen, the commits left
- * by Project, and the Sessions open now with their Status, the ones at work or waiting first. */
-export function figures(
-  groups: { section: Section; items: LooseEnd[] }[],
-  projects: Project[],
-  now: Date,
-): { looseEnds: Figure; focus: FocusPart[]; unpushed: Figure; open: OpenPart[] } {
-  const items = groups.flatMap((g) => g.items);
-  const byProject = (value: (p: Project) => number) =>
-    ranked(items.map((le) => ({ label: le.project.name, value: value(le.project), color: le.project.area?.color ?? null })));
-  const order: Record<StatusName, number> = { Busy: 0, Waiting: 1, Quiet: 2 };
+/** The Projects in Focus in the order chosen, each with its Drift from that intention. */
+export function focusRows(projects: Project[], now: Date): FocusPart[] {
+  return projects
+    .filter((p) => p.focusSince)
+    .sort((a, b) => time(a.focusSince!) - time(b.focusSince!))
+    .flatMap((p) => {
+      const f = focusDrift(p, now);
+      return f ? [{ project: p, days: f.days, active: f.active }] : [];
+    });
+}
+
+/** The counts the greeting's line carries beside the Loose Ends: the commits not pushed across
+ * the Loose Ends' Projects, and the Sessions open across every Project. */
+export function headline(projects: Project[], groups: { section: Section; items: LooseEnd[] }[]): { unpushed: number; open: number } {
   return {
-    looseEnds: ranked(groups.map((g) => ({ label: g.section, value: g.items.length }))),
-    focus: projects
-      .filter((p) => p.focusSince)
-      .sort((a, b) => time(a.focusSince!) - time(b.focusSince!))
-      .flatMap((p) => {
-        const f = focusDrift(p, now);
-        return f ? [{ project: p, days: f.days, active: f.active }] : [];
-      }),
-    unpushed: byProject((p) => p.repo?.unpushed ?? 0),
-    open: projects
-      .flatMap((p) => p.openSessions.map((o) => ({ label: p.name, color: p.area?.color, status: status(o, now) })))
-      .sort((a, b) => order[a.status] - order[b.status]),
+    unpushed: groups.flatMap((g) => g.items).reduce((n, le) => n + (le.project.repo?.unpushed ?? 0), 0),
+    open: projects.reduce((n, p) => n + p.openSessions.length, 0),
   };
 }
 
