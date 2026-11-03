@@ -132,8 +132,9 @@ window. A view is described here once it is built; until then this section holds
   Activity, Changes, Last Session with its Status, Last Prompt and open Issues, then Resume,
   New Session and Open Project; a Session's its whole title, Status, Last Turn, Project and Last Prompt, then
   Resume; the hub's every Project, the Drifting first, each opening its own panel. The selected
-  node wears a ring in `text`. The network fits the page beside the panel, never above 1:1; the
-  wheel or a pinch zooms around the pointer (¼× to 4×), dragging the ground pans and a
+  node wears a ring in `text`. The network fits the page beside the panel, up to 1.6× so a small
+  one fills it; the wheel or a pinch zooms around the pointer (¼× to 4×) – a pinch anywhere else
+  in the window zooms nothing, never the page – dragging the ground pans and a
   double-click fits it again, with Zoom Out, Fit and Zoom In bottom right for the keyboard. It
   keeps its layout and its zoom across a refresh from the bridge and a visit to another page: only
   a node or a link that comes or goes sets it moving again. It is kept for two weeks of

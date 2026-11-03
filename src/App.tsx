@@ -40,8 +40,18 @@ export default function App() {
         setFindOpen(true);
       }
     }
+    // A touchpad's pinch comes as a wheel with Ctrl held, and the webview would zoom the whole
+    // page with it. It is swallowed everywhere; over the Graph's network, the Graph's own listener
+    // has zoomed the network first. Not passive, or preventDefault would do nothing.
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) e.preventDefault();
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("wheel", onWheel);
+    };
   }, [setFindOpen, quit, refresh]);
 
   return (

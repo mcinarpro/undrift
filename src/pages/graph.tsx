@@ -173,8 +173,12 @@ function useReducedMotion(): boolean {
   return still;
 }
 
-/** The viewBox that holds every node with a margin, centred on them. It never zooms in past 1:1,
- * so a small network keeps its size, and zooms out until a large one fits. `reserve` is the width
+/** How far the fit may zoom in: a small network grows to fill the page, up to here, so its names
+ * read on a wide window; past that the nodes would look blown up rather than large. */
+const FIT_MAX = 1.6;
+
+/** The viewBox that holds every node with a margin, centred on them. It zooms in up to `FIT_MAX`,
+ * so a small network fills the page, and zooms out until a large one fits. `reserve` is the width
  * on the right that an open panel covers: the network fits beside it, never under it. */
 function fit(nodes: GraphNode[], w: number, h: number, reserve = 0): string {
   if (nodes.length === 0 || w === 0 || h === 0) return `${-w / 2} ${-h / 2} ${w} ${h}`;
@@ -188,7 +192,7 @@ function fit(nodes: GraphNode[], w: number, h: number, reserve = 0): string {
   // Wide enough for a Project's name, which runs on either side of its node and under it.
   const margin = 80;
   const room = Math.max(w - reserve, w / 3);
-  const scale = Math.min(1, room / (x1 - x0 + 2 * margin), h / (y1 - y0 + 2 * margin));
+  const scale = Math.min(FIT_MAX, room / (x1 - x0 + 2 * margin), h / (y1 - y0 + 2 * margin));
   const [vw, vh] = [w / scale, h / scale];
   return `${(x0 + x1) / 2 - room / scale / 2} ${(y0 + y1) / 2 - vh / 2} ${vw} ${vh}`;
 }
