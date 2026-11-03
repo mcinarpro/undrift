@@ -105,13 +105,26 @@ window. A view is described here once it is built; until then this section holds
   in SVG, a hub per Area in its colour, a node per Project ringed in its group's colour, a node per
   open Session by Status – a 28 px disc with a robot glyph, busy in `accent` with a quarter ring
   turning around it, waiting in `text`, quiet hollow – and an earlier Session as a small `alpha-600`
-  dot, on 1 px links in `line`. A legend
-  sits bottom left. Every node takes focus, and a click or Enter opens its panel on the right
+  dot, on 1 px links in `line`. An open Session wears its title beside its dot – `type-label-12` in
+  `text-2` on a `surface` chip edged in `line`, cut at 28 characters, above every node – and an
+  earlier one stays unlabelled. The page's own **rail** (§ Components) sits on the left, the title
+  and the network beside it: **Loose Ends** – a row per Loose End, its Area swatch, Project and age
+  in `type-label-12` `muted` over the Session's title, and a tertiary icon Resume (*Resume* in its
+  tooltip) – then **Areas** – each with its swatch and its count of Projects, then Unsorted – then
+  **Sessions** – Busy, Waiting, Quiet and Earlier, each with its dot and its count. A row under the
+  pointer or the focus lights its part of the network – a Loose End its Project and Sessions, an
+  Area its hub and Projects, a Status its Sessions and their Projects – and fades every other node
+  and link to 30% over 150 ms, at once under reduced motion; a row that lights nothing, as a Status
+  at 0, fades nothing. A Loose End or an
+  Area opens its node's panel, as a click on the node does, and is current while it is open; a
+  Status has no panel, so choosing it keeps its part lit until it is chosen again, Esc or a click on
+  the ground. A legend sits bottom left with what the rail does not explain: the Project rings and
+  the links. Every node takes focus, and a click or Enter opens its panel on the right
   instead of leaving the page – the one side panel in Undrift, since the Graph is read by moving
   between its parts: a 360 px `surface` card at 12 px with `--ud-shadow-medium`, closed by its
   Close, Esc or a click on the ground. A Project's panel holds its Drift strip, Drift, Last
   Activity, Area, Changes, Last Session with its Status, Last Prompt and open Issues, then Resume,
-  New Session and Open Project; a Session's its Status, Last Turn, Project and Last Prompt, then
+  New Session and Open Project; a Session's its whole title, Status, Last Turn, Project and Last Prompt, then
   Resume; an Area's its Projects, the Drifting first, each opening its own panel. The selected
   node wears a ring in `text`. The network fits the page beside the panel, never above 1:1; the
   wheel or a pinch zooms around the pointer (¼× to 4×), dragging the ground pans and a
@@ -305,8 +318,9 @@ The logo comes from `art/` – never redrawn, never retyped; in the interface it
   options, each an icon with its name in `sr-only` text (Grid and List on Projects). `pill` is
   Geist's Theme Switcher: round, the chosen icon on `surface` inside an edge with a soft
   `alpha-100` drop.
-- **Rail** (`Rail` in `projects.tsx`), a page's own filters beside its content, as on Vercel's
-  dashboard: 240 px, sticky under the header, its sections uppercase `type-label-12` `muted`
+- **Rail** (`RailItem` and `RailSection` in `rail.tsx`), a page's own filters beside its content, as
+  on Vercel's dashboard – Projects narrows its list with it, the Graph lights its network: 240 px,
+  sticky under the header, its sections uppercase `type-label-12` `muted`
   headings (`h2`) over 32 px rows with a 6 px radius – the dot or swatch, the label in
   `type-label-14`, the count at the end in `type-label-13` `muted` with `tabular-nums`; a row
   without a mark keeps its place, so the labels line up. A row is a toggle (`aria-pressed`): the

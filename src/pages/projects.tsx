@@ -4,6 +4,7 @@ import { Action } from "@/components/action";
 import { AreaSwatch, Empty, FocusBadge, GROUP_DOT, GroupBadge, GroupDot, ProjectAvatar, Segmented, StatusMark, useNow, When } from "@/components/bits";
 import { DriftStrip } from "@/components/drift-strip";
 import { Icon } from "@/components/icon";
+import { NO_MARKER, RailItem, RailSection } from "@/components/rail";
 import { failed } from "@/components/toast";
 import {
   DropdownMenu,
@@ -49,42 +50,9 @@ const RING = "focus-visible:shadow-[0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--
 const MENU_ROW = "h-9 gap-2 rounded-md px-2 text-sm";
 const MENU = "rounded-xl p-1 ring-0 shadow-(--ud-shadow-menu)";
 
-/** One choice of the rail, on `alpha-200` while it is current, as the header's tabs are. A toggle:
- * choosing the current one again gives its section back to All. */
-function RailItem({ current, marker, label, count, onClick }: { current: boolean; marker?: ReactNode; label: string; count: number; onClick: () => void }) {
-  return (
-    <li>
-      <button
-        type="button"
-        aria-pressed={current}
-        onClick={onClick}
-        className={cn(
-          "flex h-8 w-full items-center gap-2 rounded-md px-2.5 type-label-14 transition-colors duration-150",
-          current ? "bg-alpha-200 text-foreground" : "text-text-2 hover:bg-alpha-100 hover:text-foreground",
-        )}
-      >
-        {marker}
-        <span className="grow truncate text-left">{label}</span>
-        <span className="type-label-13 text-muted-foreground tabular-nums">{count}</span>
-      </button>
-    </li>
-  );
-}
-
-function RailSection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-1">
-      <h2 className="px-2.5 type-label-12 text-muted-foreground uppercase">{title}</h2>
-      <ul className="flex flex-col gap-0.5">{children}</ul>
-    </section>
-  );
-}
-
-/** Keeps the rows without a dot or a swatch in line with those that have one. */
-const NO_MARKER = <span aria-hidden="true" className="size-2.5 shrink-0" />;
-
 /** The page's own rail: All with the groups, the Loose Ends and the Focus, then the Areas. One
- * choice per section, and the two combine; each count says what choosing it would show. */
+ * choice per section, and the two combine; each count says what choosing it would show. A row is
+ * a toggle: choosing the current one again gives its section back to All. */
 function Rail({ projects, area, grp, now }: { projects: Project[]; area: AreaFilter; grp: GroupFilter; now: Date }) {
   const setFilters = useStore((s) => s.setFilters);
   const groups = groupFilters(projects, now, (p) => matches(p, area));

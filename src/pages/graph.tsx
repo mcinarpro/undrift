@@ -1,10 +1,11 @@
 import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type ForceLink, type Simulation, type SimulationLinkDatum, type SimulationNodeDatum } from "d3-force";
-import { useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { Action } from "@/components/action";
-import { Activity, AreaName, AreaSwatch, Diff, Empty, Field, GroupBadge, GroupDot, ProjectAvatar, STATUS_DOT, StatusMark, useNow, When } from "@/components/bits";
+import { Activity, AreaName, AreaSwatch, Diff, Empty, Field, GroupBadge, GroupDot, Hint, ProjectAvatar, STATUS_DOT, StatusMark, useNow, When } from "@/components/bits";
 import { Icon } from "@/components/icon";
-import { status, type StatusName } from "@/lib/home";
-import { drift, group, lastSession, ordered, type Group } from "@/lib/projects";
+import { lightHandlers, RailItem, RailSection, type LightBy } from "@/components/rail";
+import { age, looseEnds, status, type LooseEnd, type StatusName } from "@/lib/home";
+import { areaFilters, drift, group, lastSession, ordered, type Group } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store";
 import type { Project, Session } from "@/types";
@@ -14,10 +15,12 @@ import type { Project, Session } from "@/types";
 // by a d3-force simulation and drawn in SVG. It is the one page that moves on its own (DESIGN.md
 // § Shape and motion): the network settles, a busy Session's dot pulses, and sparks run from it to
 // its Project and on to the Area. A click on a node opens its panel on the right, so the network
-// stays in view while one of its parts is read.
+// stays in view while one of its parts is read. A rail on the left says what there is to look at,
+// and a row under the pointer or the focus lights its part of the network and fades the rest.
 
 /** An earlier Session has no Status: only its transcript remains (GLOSSARY.md § Session). */
 type Dot = StatusName | "Earlier";
+const DOTS: Dot[] = ["Busy", "Waiting", "Quiet", "Earlier"];
 
 type Kind = "hub" | "project" | "session";
 
@@ -38,6 +41,10 @@ type GraphNode = SimulationNodeDatum & {
 };
 
 type Link = SimulationLinkDatum<GraphNode> & { source: string | GraphNode; target: string | GraphNode };
+
+// A node's id says what it stands for, so the rail and the panels find the node a row means.
+const hubId = (area: string | null) => (area ? `area:${area}` : "unsorted");
+const projectId = (p: Project) => `project:${p.path}`;
 
 // Every node the Graph has placed, by id, kept outside the page: a refresh from the bridge and a
 // visit to another page both find each node where it was, so the layout never starts over.
@@ -91,7 +98,7 @@ function build(projects: Project[], now: Date): { nodes: GraphNode[]; links: Lin
     return { x: (p?.x ?? 0) + (Math.random() - 0.5) * spread, y: (p?.y ?? 0) + (Math.random() - 0.5) * spread };
   };
 
-  const hubOf = (p: Project) => (p.area ? `area:${p.area.name}` : "unsorted");
+  const hubOf = (p: Project) => hubId(p.area?.name ?? null);
   const hubs = new Map<string, { label: string; color?: string; rank: number }>();
   for (const p of projects) hubs.set(hubOf(p), p.area ? { label: p.area.name, color: p.area.color, rank: p.area.rank } : { label: "Unsorted", rank: Infinity });
   const ring = [...hubs.entries()].sort((a, b) => a[1].rank - b[1].rank);
@@ -101,7 +108,7 @@ function build(projects: Project[], now: Date): { nodes: GraphNode[]; links: Lin
   });
 
   for (const p of projects) {
-    const id = `project:${p.path}`;
+    const id = projectId(p);
     add({ id, kind: "project", parent: hubOf(p), label: p.name, project: p, group: group(p, now) }, beside(hubOf(p), 60));
     const open = new Map(p.openSessions.map((o) => [o.id, o]));
     // An open Session that has no transcript yet still gets its dot.
@@ -120,6 +127,30 @@ function build(projects: Project[], now: Date): { nodes: GraphNode[]; links: Lin
   for (const id of known.keys()) if (!ids.has(id)) known.delete(id);
   return { nodes, links };
 }
+
+/** The part of the network a rail row lights: a node with the nodes tied right under it – an
+ * Area's hub with its Projects, or a Project with its Sessions – or the Sessions in one Status
+ * with their Projects. */
+type Light = { root: string } | { dot: Dot };
+
+/** The ids of the nodes a light keeps at full strength; null when it finds none – a row whose node
+ * left on a refresh, or a Status no Session is in – so the network never fades with nothing lit. */
+function litBy(light: Light, nodes: GraphNode[]): Set<string> | null {
+  const ids = new Set<string>();
+  for (const n of nodes) {
+    if ("root" in light) {
+      if (n.id === light.root || n.parent === light.root) ids.add(n.id);
+    } else if (n.kind === "session" && n.dot === light.dot) {
+      ids.add(n.id);
+      if (n.parent) ids.add(n.parent);
+    }
+  }
+  return ids.size > 0 ? ids : null;
+}
+
+/** A node or link at full strength, or at 30% while another part is lit. The base rule in
+ * `index.css` makes the fade instant under reduced motion. */
+const fade = (dim: boolean) => cn("transition-opacity duration-150", dim && "opacity-30");
 
 /** The zoom and pan laid over the fit: a scale, then a shift in the fitted viewBox's units. */
 type View = { k: number; x: number; y: number };
@@ -187,12 +218,12 @@ const PANEL_ID = "graph-panel";
 /** The panel's width in px, which the network makes room for. */
 const PANEL_WIDTH = 360;
 
-/** What a node needs to open its panel. */
-type Selectable = { selected: boolean; onSelect: (id: string) => void };
+/** What a node needs to open its panel, and whether a lit part of the network leaves it faded. */
+type Selectable = { selected: boolean; onSelect: (id: string) => void; dim: boolean };
 
 /** A node that a click or Enter selects, opening its panel: an SVG group that takes focus and the
  * keyboard like a button, and says whether its panel is open. */
-function SelectableNode({ n, label, selected, onSelect, children }: { n: GraphNode; label: string; children: ReactNode } & Selectable) {
+function SelectableNode({ n, label, selected, onSelect, dim, children }: { n: GraphNode; label: string; children: ReactNode } & Selectable) {
   const select = () => onSelect(n.id);
   return (
     <g
@@ -209,7 +240,7 @@ function SelectableNode({ n, label, selected, onSelect, children }: { n: GraphNo
           select();
         }
       }}
-      className="group cursor-pointer outline-none"
+      className={cn("group cursor-pointer outline-none", fade(dim))}
     >
       {children}
     </g>
@@ -252,6 +283,39 @@ function WorkingRing({ r }: { r: number }) {
         className="origin-center fill-none stroke-mark [transform-box:fill-box] motion-safe:animate-spin motion-safe:[animation-duration:1.2s]"
       />
     </>
+  );
+}
+
+/** Characters of a title an open Session wears beside its dot; the panel holds the whole title. */
+const LABEL_MAX = 28;
+
+/** An open Session's title beside its dot – what runs here, not only that something does – on a
+ * chip of `surface` measured to the text, so it reads over the links. The chips are a layer of
+ * their own above every node, so a Project beside a dot never covers one; the dot's own name is
+ * its accessible name, so the chip is hidden from screen readers and lets the pointer through. */
+function SessionLabel({ n, dim }: { n: GraphNode; dim: boolean }) {
+  const text = useRef<SVGTextElement>(null);
+  const [width, setWidth] = useState(0);
+  const shown = n.label.length > LABEL_MAX ? `${n.label.slice(0, LABEL_MAX - 1)}…` : n.label;
+  useLayoutEffect(() => {
+    const measure = () => setWidth(text.current?.getComputedTextLength() ?? 0);
+    measure();
+    // Measured again once Geist has loaded, or a chip sized on the fallback font would not fit it.
+    let live = true;
+    document.fonts.ready.then(() => live && measure());
+    return () => {
+      live = false;
+    };
+  }, [shown]);
+  // Past the ring a selected dot wears, so the chip never covers it.
+  const x = (n.x ?? 0) + RADIUS.session + 18;
+  return (
+    <g transform={`translate(${x},${n.y ?? 0})`} className={cn("pointer-events-none", fade(dim))}>
+      <rect x={-6} y={-10} width={width + 12} height={20} rx={6} strokeWidth={1} className="fill-card stroke-border" />
+      <text ref={text} dominantBaseline="central" className="fill-text-2 type-label-12">
+        {shown}
+      </text>
+    </g>
   );
 }
 
@@ -368,7 +432,7 @@ function SessionPanel({ node, now, onSelect }: { node: GraphNode; now: Date; onS
     <>
       <header className="flex min-w-0 flex-col gap-1 pr-8">
         <p className="type-label-13 text-muted-foreground">Session</p>
-        <h2 className="line-clamp-2 type-heading-16">{node.label}</h2>
+        <h2 className="type-heading-16 break-words">{node.label}</h2>
       </header>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
         <Field label="Status">{dot === "Earlier" ? <span className="text-muted-foreground">Earlier</span> : <StatusMark status={dot} />}</Field>
@@ -376,7 +440,7 @@ function SessionPanel({ node, now, onSelect }: { node: GraphNode; now: Date; onS
         <Field label="Project" className="col-span-2">
           <button
             type="button"
-            onClick={() => onSelect(`project:${project.path}`)}
+            onClick={() => onSelect(projectId(project))}
             className="-mx-1 flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 transition-colors duration-150 hover:bg-alpha-100 focus-visible:shadow-[0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--ud-focus)]"
           >
             <ProjectAvatar name={project.name} color={project.area?.color} size={20} />
@@ -415,7 +479,7 @@ function AreaPanel({ node, projects, now, onSelect }: { node: GraphNode; project
           <li key={p.path}>
             <button
               type="button"
-              onClick={() => onSelect(`project:${p.path}`)}
+              onClick={() => onSelect(projectId(p))}
               className="flex w-full min-w-0 items-center gap-3 rounded-md px-2 py-2 text-left transition-colors duration-150 hover:bg-alpha-100 focus-visible:shadow-[0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--ud-focus)]"
             >
               <ProjectAvatar name={p.name} color={p.area?.color} size={24} />
@@ -462,10 +526,12 @@ function LegendItem({ mark, children }: { mark: ReactNode; children: ReactNode }
   );
 }
 
-/** What the rings and dots mean, in the corner. */
+/** A Session's mark as the rail shows it beside its Status. */
+const DOT_MARK: Record<Dot, string> = { ...STATUS_DOT, Earlier: "bg-alpha-600" };
+
+/** What the rail does not explain, in the corner: the rings around the Projects, and the links. */
 function Legend() {
   const ring = (color: string) => <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ boxShadow: `inset 0 0 0 2px var(--ud-${color})` }} />;
-  const dot = (cls: string) => <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full", cls)} />;
   return (
     <div className="absolute bottom-4 left-4 flex gap-6 rounded-xl px-4 py-3 type-label-12 text-text-2 material-small">
       <ul className="flex flex-col gap-1.5" aria-label="Projects">
@@ -473,13 +539,115 @@ function Legend() {
         <LegendItem mark={ring("drifting")}>Drifting</LegendItem>
         <LegendItem mark={ring("parked")}>Parked</LegendItem>
       </ul>
-      <ul className="flex flex-col gap-1.5" aria-label="Sessions">
-        <LegendItem mark={dot(STATUS_DOT.Busy)}>Busy</LegendItem>
-        <LegendItem mark={dot(STATUS_DOT.Waiting)}>Waiting</LegendItem>
-        <LegendItem mark={dot(STATUS_DOT.Quiet)}>Quiet</LegendItem>
-        <LegendItem mark={dot("bg-alpha-600")}>Earlier</LegendItem>
+      <ul className="flex flex-col gap-1.5" aria-label="Links">
+        <LegendItem mark={<span aria-hidden="true" className="h-px w-2.5 shrink-0 bg-border" />}>Tied to Area or Project</LegendItem>
       </ul>
     </div>
+  );
+}
+
+/** A Loose End in the rail: its Project and age over the Session's title, which opens the
+ * Project's panel, and Resume, as on Home. */
+function LooseEndRow({ le, now, current, onSelect, onLight }: { le: LooseEnd; now: Date; current: boolean; onSelect: () => void; onLight: (on: boolean, by: LightBy) => void }) {
+  const resume = useStore((s) => s.resume);
+  const { project, session } = le;
+  return (
+    // The row lights its Project while the pointer or the focus is anywhere in it, Resume included.
+    <li
+      {...lightHandlers(onLight)}
+      className={cn("flex min-w-0 items-center gap-1 rounded-md pr-1 transition-colors duration-150", current ? "bg-alpha-200" : "hover:bg-alpha-100")}
+    >
+      <button type="button" aria-pressed={current} onClick={onSelect} className="flex min-w-0 grow flex-col gap-0.5 rounded-md py-1.5 pl-2.5 text-left">
+        <span className="flex min-w-0 items-center gap-1.5 type-label-12 text-muted-foreground">
+          <AreaSwatch color={project.area?.color} className="size-2" />
+          <span className="truncate">{project.name}</span>
+          <span className="shrink-0 tabular-nums">· {age(session.lastActivity, now)}</span>
+        </span>
+        <span className="truncate type-label-14">{session.title}</span>
+      </button>
+      {/* An icon alone: the 240 px rail has no room for the word beside the title. */}
+      <Hint label="Resume">
+        <Action variant="tertiary" size="icon" aria-label={`Resume ${session.title}`} onClick={() => resume(project.path, session.id)}>
+          <Icon name="resume" />
+        </Action>
+      </Hint>
+    </li>
+  );
+}
+
+/** The Graph's own rail: the Loose Ends, the Areas, then the Sessions by Status, each row lighting
+ * its part of the network under the pointer or the focus. A Loose End or an Area opens its node's
+ * panel, as a click on the node does; a Status, which has no panel, keeps its part lit until it is
+ * chosen again. */
+function GraphRail({
+  projects,
+  nodes,
+  now,
+  selected,
+  chosen,
+  onSelect,
+  onChoose,
+  onLight,
+}: {
+  projects: Project[];
+  nodes: GraphNode[];
+  now: Date;
+  selected: string | null;
+  chosen: Dot | null;
+  onSelect: (id: string | null) => void;
+  onChoose: (dot: Dot | null) => void;
+  onLight: (light: Light | null, by: LightBy) => void;
+}) {
+  const ends = looseEnds(projects, now).flatMap((g) => g.items);
+  // The rail's All would light the whole network, which is the network unlit.
+  const areas = areaFilters(projects).filter((o) => o.filter.kind !== "all");
+  const toggle = (id: string) => onSelect(selected === id ? null : id);
+  const lightOn = (light: Light) => (on: boolean, by: LightBy) => onLight(on ? light : null, by);
+  return (
+    <nav aria-label="What to look at" className="flex h-full w-60 shrink-0 flex-col gap-6 overflow-y-auto py-8 pl-6">
+      {ends.length > 0 && (
+        <RailSection title="Loose Ends">
+          {ends.map((le) => {
+            const id = projectId(le.project);
+            return <LooseEndRow key={id} le={le} now={now} current={selected === id} onSelect={() => toggle(id)} onLight={lightOn({ root: id })} />;
+          })}
+        </RailSection>
+      )}
+      <RailSection title="Areas">
+        {areas.map((o) => {
+          const id = hubId(o.filter.kind === "area" ? o.filter.name : null);
+          return (
+            <RailItem
+              key={id}
+              current={selected === id}
+              marker={<AreaSwatch color={o.color} className="size-2.5" />}
+              label={o.label}
+              count={o.count}
+              onClick={() => toggle(id)}
+              onLight={lightOn({ root: id })}
+            />
+          );
+        })}
+      </RailSection>
+      <RailSection title="Sessions">
+        {DOTS.map((dot) => (
+          <RailItem
+            key={dot}
+            current={chosen === dot}
+            // The 10 px column the Areas' swatches take, so the labels line up across sections.
+            marker={
+              <span aria-hidden="true" className="flex size-2.5 shrink-0 items-center justify-center">
+                <span className={cn("size-2 rounded-full", DOT_MARK[dot])} />
+              </span>
+            }
+            label={dot}
+            count={nodes.filter((n) => n.dot === dot).length}
+            onClick={() => onChoose(chosen === dot ? null : dot)}
+            onLight={lightOn({ dot })}
+          />
+        ))}
+      </RailSection>
+    </nav>
   );
 }
 
@@ -503,16 +671,24 @@ export function Graph() {
   const pan = useRef<{ id: number; x: number; y: number; clientX: number; clientY: number } | null>(null);
   // The node whose panel is open, by id, so the panel follows the node across a refresh.
   const [selected, setSelected] = useState<string | null>(null);
+  // The part of the network a rail row lights: the row under the pointer, else the row with the
+  // focus, else the Status chosen in the rail.
+  const [previewed, setPreviewed] = useState<Record<LightBy, Light | null>>({ pointer: null, focus: null });
+  const [chosen, setChosen] = useState<Dot | null>(null);
+  const clear = () => {
+    setSelected(null);
+    setChosen(null);
+  };
 
-  // Esc closes the panel, unless it is Find's to close.
+  // Esc closes the panel and lets go of the Status chosen in the rail, unless it is Find's to close.
   useEffect(() => {
-    if (!selected) return;
+    if (!selected && !chosen) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape" && !useStore.getState().findOpen) setSelected(null);
+      if (e.key === "Escape" && !useStore.getState().findOpen) clear();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selected]);
+  }, [selected, chosen]);
 
   /** A point of the screen in the fitted viewBox's units, before the zoom and pan. */
   const toFitted = (clientX: number, clientY: number) => {
@@ -612,123 +788,148 @@ export function Graph() {
   const busy = graph.nodes.filter((n) => n.dot === "Busy");
   // A node that left the network takes its panel with it.
   const open = selected ? byId.get(selected) : undefined;
-  const select = (id: string) => ({ selected: id === selected, onSelect: setSelected });
+  const light = previewed.pointer ?? previewed.focus ?? (chosen ? { dot: chosen } : null);
+  const lit = light && litBy(light, graph.nodes);
+  const dim = (id: string) => lit !== null && !lit.has(id);
+  const select = (id: string) => ({ selected: id === selected, onSelect: setSelected, dim: dim(id) });
 
   return (
-    // The title sits above the network rather than over it, so no node ever slips under it.
-    <div className="flex h-full flex-col">
-      <header className="px-8 pt-8">
-        <h1 className="type-heading-24">Graph</h1>
-      </header>
-      <div ref={box} className="relative min-h-[480px] w-full grow overflow-hidden">
-        {projects && projects.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Empty icon={<Icon name="graph" size={20} />} title="Nothing to draw yet.">
-              The Graph draws each Project once Undrift has found one.
-            </Empty>
-          </div>
-        )}
-        {size.w > 0 && graph.nodes.length > 0 && (
-          // Dragging the ground pans, a click on it closes the panel and a double-click fits the
-          // network again; a node keeps its own click.
-          <svg
-            ref={svg}
-            width={size.w}
-            height={size.h}
-            viewBox={fit(graph.nodes, size.w, size.h, open ? PANEL_WIDTH + 32 : 0)}
-            role="group"
-            aria-label="The Projects as a network, tied to their Area"
-            className="absolute inset-0 cursor-grab touch-none select-none active:cursor-grabbing"
-            onPointerDown={(e) => {
-              if (e.button !== 0 || (e.target as Element).closest("[role=button]")) return;
-              const p = toFitted(e.clientX, e.clientY);
-              if (!p) return;
-              pan.current = { id: e.pointerId, x: p.x, y: p.y, clientX: e.clientX, clientY: e.clientY };
-              e.currentTarget.setPointerCapture(e.pointerId);
-            }}
-            onPointerMove={(e) => {
-              const start = pan.current;
-              const p = start?.id === e.pointerId && toFitted(e.clientX, e.clientY);
-              if (!start || !p) return;
-              pan.current = { ...start, x: p.x, y: p.y };
-              changeView((v) => ({ ...v, x: v.x + p.x - start.x, y: v.y + p.y - start.y }));
-            }}
-            onPointerUp={(e) => {
-              const start = pan.current;
-              if (start && Math.hypot(e.clientX - start.clientX, e.clientY - start.clientY) < 4) setSelected(null);
-              pan.current = null;
-            }}
-            onPointerCancel={() => (pan.current = null)}
-            onDoubleClick={(e) => {
-              if (!(e.target as Element).closest("[role=button]")) changeView(() => FITTED);
-            }}
-          >
-            <g transform={`translate(${view.x},${view.y}) scale(${view.k})`}>
-            <g aria-hidden="true">
-              {graph.links.map((l) => {
-                const [a, b] = [at(l.source), at(l.target)];
-                if (!a || !b) return null;
-                return <line key={`${a.id}>${b.id}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} strokeWidth={1} className="stroke-border" />;
-              })}
-            </g>
-            {/* Sparks run from a busy Session to its Project and on to the Area, never under
-                reduced motion. */}
-            {!still && (
+    <div className="flex h-full">
+      {projects && projects.length > 0 && (
+        <GraphRail
+          projects={projects}
+          nodes={graph.nodes}
+          now={now}
+          selected={selected}
+          chosen={chosen}
+          onSelect={setSelected}
+          onChoose={setChosen}
+          onLight={(l, by) => setPreviewed((p) => ({ ...p, [by]: l }))}
+        />
+      )}
+      {/* The title sits above the network rather than over it, so no node ever slips under it. */}
+      <div className="flex min-w-0 grow flex-col">
+        <header className="px-8 pt-8">
+          <h1 className="type-heading-24">Graph</h1>
+        </header>
+        <div ref={box} className="relative min-h-[480px] w-full grow overflow-hidden">
+          {projects && projects.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Empty icon={<Icon name="graph" size={20} />} title="Nothing to draw yet.">
+                The Graph draws each Project once Undrift has found one.
+              </Empty>
+            </div>
+          )}
+          {size.w > 0 && graph.nodes.length > 0 && (
+            // Dragging the ground pans, a click on it closes the panel and a double-click fits the
+            // network again; a node keeps its own click.
+            <svg
+              ref={svg}
+              width={size.w}
+              height={size.h}
+              viewBox={fit(graph.nodes, size.w, size.h, open ? PANEL_WIDTH + 32 : 0)}
+              role="group"
+              aria-label="The Projects as a network, tied to their Area"
+              className="absolute inset-0 cursor-grab touch-none select-none active:cursor-grabbing"
+              onPointerDown={(e) => {
+                if (e.button !== 0 || (e.target as Element).closest("[role=button]")) return;
+                const p = toFitted(e.clientX, e.clientY);
+                if (!p) return;
+                pan.current = { id: e.pointerId, x: p.x, y: p.y, clientX: e.clientX, clientY: e.clientY };
+                e.currentTarget.setPointerCapture(e.pointerId);
+              }}
+              onPointerMove={(e) => {
+                const start = pan.current;
+                const p = start?.id === e.pointerId && toFitted(e.clientX, e.clientY);
+                if (!start || !p) return;
+                pan.current = { ...start, x: p.x, y: p.y };
+                changeView((v) => ({ ...v, x: v.x + p.x - start.x, y: v.y + p.y - start.y }));
+              }}
+              onPointerUp={(e) => {
+                const start = pan.current;
+                if (start && Math.hypot(e.clientX - start.clientX, e.clientY - start.clientY) < 4) clear();
+                pan.current = null;
+              }}
+              onPointerCancel={() => (pan.current = null)}
+              onDoubleClick={(e) => {
+                if (!(e.target as Element).closest("[role=button]")) changeView(() => FITTED);
+              }}
+            >
+              <g transform={`translate(${view.x},${view.y}) scale(${view.k})`}>
               <g aria-hidden="true">
-                {busy.map((n) => {
-                  const p = n.parent ? byId.get(n.parent) : undefined;
-                  const h = p?.parent ? byId.get(p.parent) : undefined;
-                  if (!p || !h) return null;
-                  return (
-                    <circle key={n.id} r={4} className="fill-mark">
-                      <animateMotion dur="2.4s" repeatCount="indefinite" path={`M${n.x},${n.y} L${p.x},${p.y} L${h.x},${h.y}`} />
-                    </circle>
-                  );
+                {graph.links.map((l) => {
+                  const [a, b] = [at(l.source), at(l.target)];
+                  if (!a || !b) return null;
+                  return <line key={`${a.id}>${b.id}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} strokeWidth={1} className={cn("stroke-border", fade(dim(a.id) || dim(b.id)))} />;
                 })}
               </g>
-            )}
-            <g>
-              {graph.nodes
-                .filter((n) => n.kind === "session")
-                .map((n) => (
-                  <SessionDot key={n.id} n={n} {...select(n.id)} />
-                ))}
-            </g>
-            <g>
-              {graph.nodes
-                .filter((n) => n.kind === "project")
-                .map((n) => (
-                  <ProjectNode key={n.id} n={n} {...select(n.id)} />
-                ))}
-            </g>
-            <g>
-              {graph.nodes
-                .filter((n) => n.kind === "hub")
-                .map((n) => (
-                  <HubNode key={n.id} n={n} {...select(n.id)} />
-                ))}
-            </g>
-            </g>
-          </svg>
-        )}
-        {graph.nodes.length > 0 && (
-          <>
-            <Legend />
-            {open && <NodePanel node={open} nodes={graph.nodes} now={now} onSelect={setSelected} onClose={() => setSelected(null)} />}
-            {/* The same zoom for the keyboard, and for whoever does not guess the wheel. */}
-            <div className="absolute right-4 bottom-4 flex gap-1 rounded-xl p-1 material-small">
-              <Action variant="tertiary" size="icon" aria-label="Zoom Out" disabled={view.k <= MIN_ZOOM} onClick={() => zoomBy(1 / 1.25)}>
-                <Icon name="zoomOut" />
-              </Action>
-              <Action variant="tertiary" size="icon" aria-label="Fit" disabled={view === FITTED} onClick={() => changeView(() => FITTED)}>
-                <Icon name="fit" />
-              </Action>
-              <Action variant="tertiary" size="icon" aria-label="Zoom In" disabled={view.k >= MAX_ZOOM} onClick={() => zoomBy(1.25)}>
-                <Icon name="zoomIn" />
-              </Action>
-            </div>
-          </>
-        )}
+              {/* Sparks run from a busy Session to its Project and on to the Area, never under
+                  reduced motion. */}
+              {!still && (
+                <g aria-hidden="true">
+                  {busy.map((n) => {
+                    const p = n.parent ? byId.get(n.parent) : undefined;
+                    const h = p?.parent ? byId.get(p.parent) : undefined;
+                    if (!p || !h) return null;
+                    return (
+                      <circle key={n.id} r={4} className={cn("fill-mark", fade(dim(n.id)))}>
+                        <animateMotion dur="2.4s" repeatCount="indefinite" path={`M${n.x},${n.y} L${p.x},${p.y} L${h.x},${h.y}`} />
+                      </circle>
+                    );
+                  })}
+                </g>
+              )}
+              <g>
+                {graph.nodes
+                  .filter((n) => n.kind === "session")
+                  .map((n) => (
+                    <SessionDot key={n.id} n={n} {...select(n.id)} />
+                  ))}
+              </g>
+              <g>
+                {graph.nodes
+                  .filter((n) => n.kind === "project")
+                  .map((n) => (
+                    <ProjectNode key={n.id} n={n} {...select(n.id)} />
+                  ))}
+              </g>
+              <g>
+                {graph.nodes
+                  .filter((n) => n.kind === "hub")
+                  .map((n) => (
+                    <HubNode key={n.id} n={n} {...select(n.id)} />
+                  ))}
+              </g>
+              {/* Earlier Sessions stay unlabelled: only the open ones say what runs. */}
+              <g aria-hidden="true">
+                {graph.nodes
+                  .filter((n) => n.kind === "session" && n.dot !== "Earlier")
+                  .map((n) => (
+                    <SessionLabel key={n.id} n={n} dim={dim(n.id)} />
+                  ))}
+              </g>
+              </g>
+            </svg>
+          )}
+          {graph.nodes.length > 0 && (
+            <>
+              <Legend />
+              {open && <NodePanel node={open} nodes={graph.nodes} now={now} onSelect={setSelected} onClose={() => setSelected(null)} />}
+              {/* The same zoom for the keyboard, and for whoever does not guess the wheel. */}
+              <div className="absolute right-4 bottom-4 flex gap-1 rounded-xl p-1 material-small">
+                <Action variant="tertiary" size="icon" aria-label="Zoom Out" disabled={view.k <= MIN_ZOOM} onClick={() => zoomBy(1 / 1.25)}>
+                  <Icon name="zoomOut" />
+                </Action>
+                <Action variant="tertiary" size="icon" aria-label="Fit" disabled={view === FITTED} onClick={() => changeView(() => FITTED)}>
+                  <Icon name="fit" />
+                </Action>
+                <Action variant="tertiary" size="icon" aria-label="Zoom In" disabled={view.k >= MAX_ZOOM} onClick={() => zoomBy(1.25)}>
+                  <Icon name="zoomIn" />
+                </Action>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
