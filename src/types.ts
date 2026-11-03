@@ -70,6 +70,8 @@ export type Issue = {
   /** ISO timestamp of its last update. */
   updatedAt: string;
   url: string;
+  /** The open Issues blocking it, as GitHub's dependencies say: ready to Start at 0. */
+  blockedBy: number;
 };
 
 /** The Area a Project is filed under. */

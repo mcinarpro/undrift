@@ -112,8 +112,9 @@ Reopening an earlier Session in a terminal, with `claude --resume`.
 _Avoid_: Restore, continue, reopen
 
 **Issue**:
-A GitHub issue of a Project's repository: the unit of work Undrift starts from. Undrift reads
-Issues and never writes them.
+A GitHub issue of a Project's repository: the unit of work Undrift starts from. It is ready to
+Start when no open Issue blocks it, as GitHub's dependencies say; a blocked one stays on the
+Project page without Start. Undrift reads Issues and never writes them.
 _Avoid_: Ticket, task, todo, job
 
 **Start**:

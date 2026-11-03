@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { openExternal } from "@/bridge";
 import { Action, SplitAction } from "@/components/action";
-import { Activity, AreaName, AreaSwatch, Badge, Diff, Field, Gauge, GroupBadge, ProjectAvatar, StatusMark, useNow, When } from "@/components/bits";
+import { Activity, AreaName, AreaSwatch, Badge, Diff, Field, Gauge, GroupBadge, Hint, ProjectAvatar, StatusMark, useNow, When } from "@/components/bits";
 import { Icon } from "@/components/icon";
 import { Bar, useSkeleton } from "@/components/loading";
 import { failed } from "@/components/toast";
@@ -256,9 +256,16 @@ function Issues({ project, now }: { project: ProjectData; now: Date }) {
             <span className="type-label-13-mono text-muted-foreground tabular-nums">#{issue.number}</span>
             <span className="grow truncate type-label-14">{issue.title}</span>
             <When iso={issue.updatedAt} now={now} />
-            <Action variant="tertiary" size="small" onClick={() => start(project.path, issue.number)} aria-label={`Start #${issue.number}`}>
-              <Icon name="start" /> Start
-            </Action>
+            {issue.blockedBy > 0 ? (
+              // Listed, since it is the Project's, but not offered: its blockers come first.
+              <Hint label={`Blocked by ${issue.blockedBy} open ${issue.blockedBy === 1 ? "Issue" : "Issues"}`}>
+                <span className="px-2 type-label-13 text-muted-foreground">Blocked</span>
+              </Hint>
+            ) : (
+              <Action variant="tertiary" size="small" onClick={() => start(project.path, issue.number)} aria-label={`Start #${issue.number}`}>
+                <Icon name="start" /> Start
+              </Action>
+            )}
           </div>
         ))
       )}

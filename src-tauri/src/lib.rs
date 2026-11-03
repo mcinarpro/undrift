@@ -38,8 +38,12 @@ async fn new_session(shared: tauri::State<'_, bridge::Shared>, path: String) -> 
 #[tauri::command]
 async fn start(shared: tauri::State<'_, bridge::Shared>, path: String, number: u32) -> Result<(), String> {
     let project = project(&shared, &path)?;
-    if !project.issues.iter().any(|i| i.number == number) {
+    let Some(issue) = project.issues.iter().find(|i| i.number == number) else {
         return Err(format!("not an open Issue of {path}: #{number}"));
+    };
+    // The window never offers a blocked Issue; the bridge guards it anyway.
+    if issue.blocked_by > 0 {
+        return Err(format!("#{number} is blocked by an open Issue"));
     }
     terminal::start(&project.path, number)
 }

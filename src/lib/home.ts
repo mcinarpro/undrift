@@ -139,16 +139,17 @@ export function driftCells(activeDays: string[], now: Date): boolean[] {
   return Array.from({ length: 30 }, (_, i) => days.has(dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - (29 - i)))));
 }
 
-/** Every open Issue grouped by its Project: each Project's Issues the most recently updated first,
- * the Projects ordered by their newest Issue. Two checkouts of one repository share its Issues, so
- * each Issue is listed once, with the first Project that has it. */
+/** Every Issue ready to Start grouped by its Project – an open Issue with no open blocker – each
+ * Project's Issues the most recently updated first, the Projects ordered by their newest Issue.
+ * Two checkouts of one repository share its Issues, so each Issue is listed once, with the first
+ * Project that has it. */
 export function issuesByProject(projects: Project[]): { project: Project; issues: Issue[] }[] {
   const seen = new Set<string>();
   return projects
     .map((project) => ({
       project,
       issues: project.issues
-        .filter((i) => !seen.has(i.url) && seen.add(i.url))
+        .filter((i) => i.blockedBy === 0 && !seen.has(i.url) && seen.add(i.url))
         .sort((a, b) => time(b.updatedAt) - time(a.updatedAt)),
     }))
     .filter((g) => g.issues.length > 0)
