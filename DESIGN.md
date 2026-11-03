@@ -91,7 +91,9 @@ window. A view is described here once it is built; until then this section holds
 - **Project page**, shaped like Vercel's Project Overview. Its page header holds the breadcrumb,
   *Area / Project*, whose Area leads back to Projects filtered by it; then one line – the 32 px
   avatar, the name as the `h1` in `type-heading-24`, the Area as a Badge (its swatch and name on
-  `raised` in `text-2`) and, while a Session is open, its Status as on Home, or *2 Sessions open*
+  `raised` in `text-2`; a chevron on hover, and it opens a menu of the Areas, Unsorted and *New
+  Area…*, which asks for a name and a colour from the Area palette in a modal) and, while a
+  Session is open, its Status as on Home, or *2 Sessions open*
   in the most pressing one's – with the actions at its end: the page's only primary button, a split
   **Resume** of the last Session whose menu holds New Session and Resume on each earlier Session of
   the last 7 days (*Last 7 Days*), or **New Session** with no Session yet, then a secondary

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { openExternal } from "@/bridge";
 import { Action, SplitAction } from "@/components/action";
 import { Activity, AreaName, AreaSwatch, Badge, Diff, Field, Gauge, GroupBadge, Hint, ProjectAvatar, StatusMark, useNow, When } from "@/components/bits";
@@ -6,9 +6,21 @@ import { Icon } from "@/components/icon";
 import { Bar, useSkeleton } from "@/components/loading";
 import { failed } from "@/components/toast";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-import { DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { fileLines, status } from "@/lib/home";
-import { drift, earlierSessions, focusDrift, group, lastSession, openRows, recentSessions, type OpenRow } from "@/lib/projects";
+import { AREA_COLORS, areaFilters, drift, earlierSessions, filterKey, focusDrift, group, lastSession, openRows, recentSessions, type AreaColor, type OpenRow } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store";
 import type { Project as ProjectData } from "@/types";
@@ -161,13 +173,110 @@ function ResumeAction({ project, now }: { project: ProjectData; now: Date }) {
   );
 }
 
-/** The Area as a Badge beside the title: its swatch and its name, Unsorted in the Parked grey. */
+/** The Area as a Badge beside the title – its swatch and its name, Unsorted in the Parked grey –
+ * and the menu that files the Project (GLOSSARY.md § Area): every Area there is, Unsorted, then
+ * New Area…. The radio's values are the rail's filter keys, so a name is never mistaken for a kind. */
 function AreaBadge({ project }: { project: ProjectData }) {
+  const projects = useStore((s) => s.projects) ?? [];
+  const setArea = useStore((s) => s.setArea);
+  const [creating, setCreating] = useState(false);
+  const areas = areaFilters(projects).filter((o) => o.filter.kind === "area");
+  const current = filterKey(project.area ? { kind: "area", name: project.area.name } : { kind: "unsorted" });
+  const choose = (key: string) => {
+    const chosen = areas.find((o) => filterKey(o.filter) === key);
+    setArea(project.path, chosen?.color ? { name: chosen.label, color: chosen.color } : null);
+  };
   return (
-    <Badge className="bg-secondary text-text-2">
-      <AreaSwatch color={project.area?.color} className="size-2" />
-      {project.area?.name ?? "Unsorted"}
-    </Badge>
+    <>
+      <DropdownMenu>
+        {/* A Geist select: the chevron shows on hover, and the trigger draws the double ring itself. */}
+        <DropdownMenuTrigger
+          aria-label={`Area: ${project.area?.name ?? "Unsorted"}`}
+          className="group rounded-full transition-shadow duration-150 focus-visible:shadow-[0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--ud-focus)]"
+        >
+          <Badge className="bg-secondary text-text-2 group-hover:bg-alpha-200">
+            <AreaSwatch color={project.area?.color} className="size-2" />
+            {project.area?.name ?? "Unsorted"}
+            <Icon name="chevron" className="-mr-1 size-3 text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-aria-expanded:opacity-100" />
+          </Badge>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-56 rounded-xl p-1 ring-0 shadow-(--ud-shadow-menu)">
+          <DropdownMenuRadioGroup value={current} onValueChange={choose}>
+            {areas.map((o) => (
+              <DropdownMenuRadioItem key={o.label} value={filterKey(o.filter)} className={MENU_ROW}>
+                <AreaSwatch color={o.color} className="size-2.5" />
+                {o.label}
+              </DropdownMenuRadioItem>
+            ))}
+            <DropdownMenuRadioItem value="unsorted" className={MENU_ROW}>
+              <AreaSwatch color={undefined} className="size-2.5" />
+              Unsorted
+            </DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+          <DropdownMenuSeparator className="my-1" />
+          <DropdownMenuItem onClick={() => setCreating(true)} className={MENU_ROW}>
+            New Area…
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <NewAreaDialog open={creating} onOpenChange={setCreating} onCreate={(name, color) => setArea(project.path, { name, color })} />
+    </>
+  );
+}
+
+/** New Area…: a name and a colour from the Area palette, on Geist's modal material as Find is. A
+ * name already in use files the Project under that Area – the bridge finds it by name. */
+function NewAreaDialog({ open, onOpenChange, onCreate }: { open: boolean; onOpenChange: (open: boolean) => void; onCreate: (name: string, color: AreaColor) => void }) {
+  const [name, setName] = useState("");
+  const [color, setColor] = useState<AreaColor>(AREA_COLORS[0]);
+  const ready = name.trim().length > 0;
+  const create = () => {
+    if (!ready) return;
+    onCreate(name.trim(), color);
+    onOpenChange(false);
+    setName("");
+  };
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent showCloseButton={false} className="gap-5 rounded-xl bg-card p-5 ring-0 shadow-(--ud-shadow-modal) sm:max-w-sm">
+        <DialogHeader className="gap-1 text-left">
+          <DialogTitle className="type-heading-16">New Area</DialogTitle>
+          <DialogDescription className="type-copy-14 text-text-2">A theme to file Projects under. It exists while it holds one.</DialogDescription>
+        </DialogHeader>
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            create();
+          }}
+        >
+          <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="Area name" className="h-9 edge border-0 bg-card px-3 focus-visible:ring-0 focus-visible:shadow-[0_0_0_1px_var(--ud-line),0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--ud-focus)]" />
+          <div role="radiogroup" aria-label="Colour" className="flex gap-1">
+            {AREA_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                role="radio"
+                aria-checked={color === c}
+                aria-label={c}
+                onClick={() => setColor(c)}
+                className={cn("flex size-8 items-center justify-center rounded-md transition-colors duration-150 hover:bg-alpha-100", color === c && "bg-alpha-200")}
+              >
+                <AreaSwatch color={c} className="size-3.5" />
+              </button>
+            ))}
+          </div>
+          <DialogFooter className="gap-2">
+            <Action variant="secondary" size="medium" type="button" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Action>
+            <Action variant="primary" size="medium" type="submit" disabled={!ready}>
+              Create
+            </Action>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

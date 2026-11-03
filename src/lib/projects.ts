@@ -56,6 +56,10 @@ export function ordered(projects: Project[], now: Date): Project[] {
 /** What the Projects page lists: every Project, the Unsorted ones, or one Area's by its name. */
 export type AreaFilter = { kind: "all" } | { kind: "unsorted" } | { kind: "area"; name: string };
 
+/** The Area palette (DESIGN.md § Colour, `--ud-area-*`), in the order New Area offers it. */
+export const AREA_COLORS = ["purple", "green", "pink", "teal", "gray"] as const;
+export type AreaColor = (typeof AREA_COLORS)[number];
+
 /** A filter as the value of its radio. */
 export const filterKey = (f: AreaFilter) => (f.kind === "area" ? `area:${f.name}` : f.kind);
 

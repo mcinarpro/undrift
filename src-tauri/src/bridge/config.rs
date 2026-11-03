@@ -1,12 +1,17 @@
 //! Which folders are Projects (GLOSSARY.md § Discovery): every git checkout directly under a
 //! root (`~/workspace` by default), plus every folder a Session ran in that is not inside one.
-//! Hides take Projects out; Focus and Areas are read here and written by nothing yet. The
-//! settings live in `~/.config/undrift/config.json`, reloaded when the file's mtime changes.
+//! Hides take Projects out; Focus is read here and written by nothing yet; Areas are read here
+//! and written by `set_area`, from the Project page. The settings live in
+//! `~/.config/undrift/config.json`, reloaded when the file's mtime changes.
 
 use serde::Deserialize;
+use serde_json::{json, Map, Value};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
+
+/// The Area palette (DESIGN.md § Colour, `--ud-area-*`): the only colours an Area can take.
+pub const AREA_COLORS: [&str; 5] = ["purple", "green", "pink", "teal", "gray"];
 
 #[derive(Deserialize, Clone, PartialEq, Debug)]
 #[serde(default, rename_all = "camelCase")]
@@ -64,6 +69,57 @@ pub fn expand(p: &str) -> PathBuf {
         Some(rest) => dirs::home_dir().unwrap_or_default().join(rest.trim_start_matches('/')),
         None => PathBuf::from(p),
     }
+}
+
+/// Files `project` under the Area `area` – its name and colour – or under none (GLOSSARY.md
+/// § Area). The bridge sees the file's new mtime on its next tick, as after a hand edit.
+pub fn set_area(project: &Path, area: Option<(&str, &str)>) -> std::io::Result<()> {
+    set_area_in(&path(), project, area)
+}
+
+/// The file is edited as plain JSON, so the keys this module does not read survive the write. A
+/// missing or broken file is the defaults, as `reload_if_changed` reads it. The Project's path is
+/// stored as `~/…`, so the file travels between machines; it is matched through `expand`, so an
+/// absolute path written by hand is found too.
+fn set_area_in(file: &Path, project: &Path, area: Option<(&str, &str)>) -> std::io::Result<()> {
+    if let Some((name, color)) = area {
+        if name.trim().is_empty() {
+            return Err(std::io::Error::other("an Area needs a name"));
+        }
+        if !AREA_COLORS.contains(&color) {
+            return Err(std::io::Error::other(format!("not an Area colour: {color}")));
+        }
+    }
+    let mut root: Map<String, Value> = std::fs::read_to_string(file).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+    let mut areas = match root.remove("areas") {
+        Some(Value::Array(areas)) => areas,
+        _ => Vec::new(),
+    };
+    // A Project sits in one Area at most: it leaves every Area before it joins one.
+    for a in areas.iter_mut() {
+        if let Some(Value::Array(projects)) = a.get_mut("projects") {
+            projects.retain(|p| p.as_str().is_none_or(|p| expand(p) != project));
+        }
+    }
+    if let Some((name, color)) = area {
+        let stored = Value::String(short(project));
+        let named = |a: &Value| a.get("name").and_then(Value::as_str) == Some(name);
+        match areas.iter().position(named) {
+            Some(i) => match areas[i].get_mut("projects") {
+                Some(Value::Array(projects)) => projects.push(stored),
+                _ => {
+                    if let Some(a) = areas[i].as_object_mut() {
+                        a.insert("projects".into(), Value::Array(vec![stored]));
+                    }
+                }
+            },
+            None => areas.push(json!({ "name": name, "color": color, "projects": [stored] })),
+        }
+    }
+    // An Area exists while it holds a Project, so an emptied one leaves the file.
+    areas.retain(|a| a.get("projects").and_then(Value::as_array).is_some_and(|p| !p.is_empty()));
+    root.insert("areas".into(), Value::Array(areas));
+    super::write_atomic(file, &serde_json::to_vec_pretty(&root)?)
 }
 
 /// `~/…` for a path under the home folder, the path itself otherwise.
@@ -152,6 +208,71 @@ mod tests {
         let config: Config = serde_json::from_str(r#"{"hides":["/x"]}"#).unwrap();
         assert_eq!(config.roots, vec!["~/workspace".to_string()]);
         assert_eq!(config.hides, vec!["/x".to_string()]);
+    }
+
+    fn temp(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("undrift-config-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        dir.join("config.json")
+    }
+
+    fn areas_of(file: &Path) -> Vec<(String, Vec<String>)> {
+        let root: Value = serde_json::from_str(&std::fs::read_to_string(file).unwrap()).unwrap();
+        root["areas"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| (a["name"].as_str().unwrap().to_owned(), a["projects"].as_array().unwrap().iter().map(|p| p.as_str().unwrap().to_owned()).collect()))
+            .collect()
+    }
+
+    #[test]
+    fn a_project_moves_between_areas_and_an_emptied_area_leaves() {
+        let file = temp("move");
+        let home = dirs::home_dir().unwrap();
+        let undrift = home.join("workspace/undrift");
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(
+            &file,
+            json!({
+                "terminal": "", "notify": true,
+                "areas": [
+                    { "name": "OPS", "color": "gray", "projects": [undrift.to_str().unwrap(), "~/workspace/vps"] },
+                    { "name": "Studies", "color": "teal", "projects": ["~/workspace/electricity-study"] }
+                ]
+            })
+            .to_string(),
+        )
+        .unwrap();
+        set_area_in(&file, &undrift, Some(("Studies", "teal"))).unwrap();
+        assert_eq!(
+            areas_of(&file),
+            vec![("OPS".into(), vec!["~/workspace/vps".into()]), ("Studies".into(), vec!["~/workspace/electricity-study".into(), "~/workspace/undrift".into()])]
+        );
+        set_area_in(&file, &home.join("workspace/vps"), None).unwrap();
+        assert_eq!(areas_of(&file), vec![("Studies".into(), vec!["~/workspace/electricity-study".into(), "~/workspace/undrift".into()])]);
+        let root: Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+        assert_eq!(root["terminal"], "");
+        assert_eq!(root["notify"], true);
+    }
+
+    #[test]
+    fn a_new_area_is_appended_with_its_colour_even_without_a_file() {
+        let file = temp("new");
+        let undrift = dirs::home_dir().unwrap().join("workspace/undrift");
+        set_area_in(&file, &undrift, Some(("Tools", "teal"))).unwrap();
+        assert_eq!(areas_of(&file), vec![("Tools".into(), vec!["~/workspace/undrift".into()])]);
+        let root: Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+        assert_eq!(root["areas"][0]["color"], "teal");
+    }
+
+    #[test]
+    fn an_empty_name_or_a_colour_off_the_palette_is_refused() {
+        let file = temp("refused");
+        let undrift = dirs::home_dir().unwrap().join("workspace/undrift");
+        assert!(set_area_in(&file, &undrift, Some((" ", "teal"))).is_err());
+        assert!(set_area_in(&file, &undrift, Some(("Tools", "blue"))).is_err());
+        assert!(!file.exists());
     }
 
     #[test]
