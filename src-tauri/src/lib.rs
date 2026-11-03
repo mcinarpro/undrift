@@ -132,6 +132,8 @@ pub fn run() {
         .setup(|app| {
             bridge::start(app.handle().clone());
             tray(app)?;
+            #[cfg(target_os = "linux")]
+            claim_pinch(app)?;
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -144,6 +146,26 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// On Linux a touchpad pinch is WebKitGTK's own gesture: it zooms the whole webview, and no
+/// setting turns it off (WebKit bug 273304). A GTK gesture on the window, in the capture phase,
+/// claims the sequence before the webview sees it – the documented way for a parent to take a
+/// gesture from a child – and does nothing with it. The Graph keeps its zoom through the wheel
+/// events a pinch also sends.
+#[cfg(target_os = "linux")]
+fn claim_pinch(app: &tauri::App) -> tauri::Result<()> {
+    use gtk::prelude::*;
+    let Some(window) = app.get_webview_window("main") else { return Ok(()) };
+    let zoom = gtk::GestureZoom::new(&window.gtk_window()?);
+    zoom.set_propagation_phase(gtk::PropagationPhase::Capture);
+    zoom.connect_begin(|gesture, _| {
+        gesture.set_state(gtk::EventSequenceState::Claimed);
+    });
+    // The gesture must outlive this function: dropped, its last reference would disconnect it from
+    // the window. It lives as long as the window does, which is as long as the app.
+    std::mem::forget(zoom);
+    Ok(())
 }
 
 fn tray(app: &tauri::App) -> tauri::Result<()> {
