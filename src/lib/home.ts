@@ -1,4 +1,4 @@
-import type { Issue, OpenSession, Project, Session } from "@/types";
+import type { FileChange, Issue, OpenSession, Project, Session } from "@/types";
 
 // What Home shows, worked out from the bridge's Projects. The bridge decides which Projects are
 // Loose Ends (GLOSSARY.md § Loose End); the window decides how they read on its own clock.
@@ -102,14 +102,13 @@ export function status(open: OpenSession, now: Date): StatusName {
   return now.getTime() - since < 10 * MINUTE ? "Waiting" : "Quiet";
 }
 
+/** A local day as the bridge writes it, YYYY-MM-DD. */
+export const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 /** The Drift strip's 30 cells, oldest first: whether each local day up to today had Activity. */
 export function driftCells(activeDays: string[], now: Date): boolean[] {
   const days = new Set(activeDays);
-  return Array.from({ length: 30 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (29 - i));
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    return days.has(key);
-  });
+  return Array.from({ length: 30 }, (_, i) => days.has(dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - (29 - i)))));
 }
 
 /** Every open Issue grouped by its Project: each Project's Issues the most recently updated first,
@@ -145,6 +144,13 @@ export function age(iso: string, now: Date): string {
   const days = Math.floor(ms / DAY);
   if (days < 30) return days === 1 ? "1 day ago" : `${days} days ago`;
   return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** A changed file's lines as a list shows them: `+n −n`, *new* for an untracked file, *binary*
+ * for a tracked one git cannot count. */
+export function fileLines(f: FileChange): string {
+  if (f.untracked) return "new";
+  return f.insertions === null ? "binary" : `+${f.insertions} −${f.deletions}`;
 }
 
 /** A Project's initials: the first letter of its first two words. */

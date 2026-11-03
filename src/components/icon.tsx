@@ -1,4 +1,5 @@
 import {
+  Bot,
   ChevronsUpDown,
   Ellipsis,
   ExternalLink,
@@ -12,12 +13,15 @@ import {
   Moon,
   Network,
   Play,
+  Scan,
   Search,
   Settings,
   Square,
   SquareTerminal,
   Sun,
   X,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 
 // Undrift's icons, by our own names. The only file that knows where they come from – Lucide, as in
@@ -43,6 +47,10 @@ const ICONS = {
   more: Ellipsis,
   branch: GitBranch,
   commit: GitCommitHorizontal,
+  session: Bot,
+  zoomIn: ZoomIn,
+  zoomOut: ZoomOut,
+  fit: Scan,
 } as const;
 
 export type IconName = keyof typeof ICONS;

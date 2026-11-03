@@ -1,6 +1,6 @@
 //! Opens a terminal running `claude` (AGENTS.md § Privacy contract: the only processes Undrift
-//! starts): `--resume <id>` in a Session's folder for Resume, or an Issue as the first prompt in a
-//! Project folder for Start.
+//! starts): `--resume <id>` in a Session's folder for Resume, plain `claude` in a Project folder for
+//! New Session, or an Issue as the first prompt in a Project folder for Start.
 
 /// The first prompt Start gives a Session: the implement skill fetches the Issue itself, from the
 /// repository of the folder it runs in.
@@ -15,6 +15,10 @@ pub fn resume(cwd: &str, session_id: &str) -> Result<(), String> {
         return Err("not a session id".into());
     }
     open(cwd, &["--resume", session_id])
+}
+
+pub fn new_session(cwd: &str) -> Result<(), String> {
+    open(cwd, &[])
 }
 
 pub fn start(cwd: &str, issue: u32) -> Result<(), String> {

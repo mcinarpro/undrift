@@ -19,6 +19,7 @@
     "class-variance-authority": "^0.7.1",
     "cmdk": "^1.1.1",
     "cn": "^0.5.2",
+    "d3-force": "^3.0.1",
     "lucide-react": "^1.66.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -28,11 +29,12 @@
     "zustand": "^5.0.16"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/d3-force": "^3.0.10",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^6.0.2",
     "typescript": "~6.0.3",
-    "vite": "^8.0.16",
-    "@tauri-apps/cli": "^2"
+    "vite": "^8.0.16"
   }
 }

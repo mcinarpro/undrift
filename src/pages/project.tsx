@@ -1,0 +1,279 @@
+import type { ReactNode } from "react";
+import { openExternal } from "@/bridge";
+import { Action } from "@/components/action";
+import { Activity, AreaName, Diff, Field, Gauge, GroupBadge, StatusMark, useNow, When } from "@/components/bits";
+import { Icon } from "@/components/icon";
+import { fileLines, status } from "@/lib/home";
+import { drift, earlierSessions, focusDrift, group, lastSession } from "@/lib/projects";
+import { cn } from "@/lib/utils";
+import { useStore } from "@/store";
+import type { Project as ProjectData } from "@/types";
+
+// A Project page (DESIGN.md § Layout), shaped like Vercel's Project Overview: Where You Left Off
+// answers "what was done here, and what is left?" before Resume, then the Issues, the Earlier
+// Sessions, Git and Focus. Its title is the top bar's, so the h1 is for screen readers.
+
+/** A Panel: its title over a 12 px card. */
+function Panel({ title, count, children, className }: { title: string; count?: number; children: ReactNode; className?: string }) {
+  return (
+    <section className={cn("flex min-w-0 flex-col gap-3", className)}>
+      <h2 className="flex items-center gap-2 type-label-14 font-medium">
+        {title}
+        {count !== undefined && <span className="type-label-13 text-muted-foreground tabular-nums">{count}</span>}
+      </h2>
+      <div className="flex min-w-0 flex-col rounded-xl material-small">{children}</div>
+    </section>
+  );
+}
+
+// Rows inside one card are separated by the edge colour on their top side.
+const ROW = "flex min-w-0 items-center gap-3 px-4 py-3 not-first:shadow-[0_-1px_0_0_var(--ud-line)]";
+
+/** What a card says when it has nothing to list. */
+function None({ children }: { children: ReactNode }) {
+  return <p className="px-4 py-3 type-label-13 text-muted-foreground">{children}</p>;
+}
+
+function WhereYouLeftOff({ project, now }: { project: ProjectData; now: Date }) {
+  const { resume, newSession } = useStore();
+  const last = lastSession(project);
+  const st = last?.open && status(last.open, now);
+  const left = project.repo && (project.repo.changed > 0 || (project.repo.unpushed ?? 0) > 0);
+  return (
+    <section className="flex flex-col gap-3">
+      <h2 className="type-label-14 font-medium">Where You Left Off</h2>
+      <div className="flex flex-col gap-6 rounded-xl p-6 material-small">
+        <Activity project={project} now={now} />
+        <dl className="grid grid-cols-3 gap-x-6 gap-y-4">
+          <Field label="Drift">
+            <GroupBadge group={group(project, now)} />
+            <span className="type-label-13-mono text-text-2 tabular-nums">{drift(project, now)}</span>
+          </Field>
+          <Field label="Last Activity">{project.lastActivity ? <When iso={project.lastActivity} now={now} /> : <span className="text-muted-foreground">None</span>}</Field>
+          <Field label="Area">
+            <AreaName project={project} />
+          </Field>
+          <Field label="Last Session" className="col-span-2">
+            {last ? <span className="truncate">{last.session.title}</span> : <span className="text-muted-foreground">No Session yet</span>}
+            {st && <StatusMark status={st} />}
+          </Field>
+          <Field label="Changes">
+            {!project.repo ? (
+              <span className="text-muted-foreground">Not a git repository</span>
+            ) : left ? (
+              <Diff project={project} />
+            ) : (
+              <span className="text-muted-foreground">Nothing left behind</span>
+            )}
+          </Field>
+          {last?.session.lastPrompt && (
+            <Field label="Last Prompt" className="col-span-3">
+              <span className="line-clamp-3 type-copy-14 text-text-2">“{last.session.lastPrompt}”</span>
+            </Field>
+          )}
+        </dl>
+        <div className="flex items-center gap-2">
+          {last && (
+            <Action variant="primary" size="medium" onClick={() => resume(project.path, last.session.id)}>
+              <Icon name="resume" /> Resume
+            </Action>
+          )}
+          <Action variant={last ? "secondary" : "primary"} size="medium" onClick={() => newSession(project.path)}>
+            <Icon name="start" /> New Session
+          </Action>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Issues({ project, now }: { project: ProjectData; now: Date }) {
+  const start = useStore((s) => s.start);
+  const issues = [...project.issues].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  return (
+    <Panel title="Issues" count={issues.length}>
+      {issues.length === 0 ? (
+        <None>{project.repo?.github ? "No open Issue." : "No GitHub repository, so no Issues."}</None>
+      ) : (
+        issues.map((issue) => (
+          // The row lights up as a whole and its Start has no frame, so the titles read first.
+          <div key={issue.url} className={cn(ROW, "py-2 transition-colors duration-150 hover:bg-alpha-100")}>
+            <span className="type-label-13-mono text-muted-foreground tabular-nums">#{issue.number}</span>
+            <span className="grow truncate type-label-14">{issue.title}</span>
+            <When iso={issue.updatedAt} now={now} />
+            <Action variant="tertiary" size="small" onClick={() => start(project.path, issue.number)} aria-label={`Start #${issue.number}`}>
+              <Icon name="start" /> Start
+            </Action>
+          </div>
+        ))
+      )}
+    </Panel>
+  );
+}
+
+function EarlierSessions({ project, now }: { project: ProjectData; now: Date }) {
+  const resume = useStore((s) => s.resume);
+  const sessions = earlierSessions(project);
+  return (
+    <Panel title="Earlier Sessions" count={sessions.length}>
+      {sessions.length === 0 ? (
+        <None>No earlier Session.</None>
+      ) : (
+        sessions.map((s) => (
+          <div key={s.id} className={ROW}>
+            <span className="flex min-w-0 grow flex-col">
+              <span className="truncate type-label-14">{s.title}</span>
+              {s.lastPrompt && <span className="truncate type-copy-13 text-text-2">“{s.lastPrompt}”</span>}
+            </span>
+            <When iso={s.lastActivity} now={now} />
+            <Action variant="secondary" size="small" onClick={() => resume(project.path, s.id)} aria-label={`Resume ${s.title}`}>
+              <Icon name="resume" /> Resume
+            </Action>
+          </div>
+        ))
+      )}
+    </Panel>
+  );
+}
+
+/** A list inside the Git card: its title and count, then its rows. */
+function GitList({ title, count, children }: { title: string; count: number; children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-2 px-4 py-3 not-first:shadow-[0_-1px_0_0_var(--ud-line)]">
+      <h3 className="flex items-center gap-2 type-label-13 font-medium">
+        {title}
+        <span className="text-muted-foreground tabular-nums">{count}</span>
+      </h3>
+      {children}
+    </div>
+  );
+}
+
+/** What was done and what is left, in git's words: the commits not pushed by subject, newest
+ * first, and the files changed by name – never their contents (AGENTS.md § Privacy contract). */
+function Git({ project, now }: { project: ProjectData; now: Date }) {
+  const repo = project.repo;
+  if (!repo) {
+    return (
+      <Panel title="Git">
+        <None>Not a git repository.</None>
+      </Panel>
+    );
+  }
+  const more = repo.changed - repo.files.length;
+  const moreCommits = (repo.unpushed ?? 0) - repo.commits.length;
+  return (
+    <Panel title="Git">
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-4 px-4 py-4">
+        <Field label="Branch">
+          <Icon name="branch" size={14} className="shrink-0 text-muted-foreground" />
+          <span className="truncate type-label-13-mono">{repo.branch}</span>
+        </Field>
+        <Field label="Repository">
+          {repo.github ? (
+            <button
+              type="button"
+              onClick={() => void openExternal(`https://github.com/${repo.github}`)}
+              className="flex min-w-0 items-center gap-1.5 rounded-sm type-label-13-mono text-accent-text hover:underline focus-visible:shadow-[0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--ud-focus)]"
+            >
+              <span className="truncate">{repo.github}</span>
+              <Icon name="profile" size={14} className="shrink-0" />
+            </button>
+          ) : (
+            <span className="text-muted-foreground">Not on GitHub</span>
+          )}
+        </Field>
+        <Field label="Last Commit" className="col-span-2">
+          {repo.headSubject !== null && repo.headAt ? (
+            <>
+              <span className="truncate">{repo.headSubject}</span>
+              <When iso={repo.headAt} now={now} />
+            </>
+          ) : (
+            <span className="text-muted-foreground">No commit yet</span>
+          )}
+        </Field>
+      </dl>
+      <div className="flex min-w-0 flex-col shadow-[0_-1px_0_0_var(--ud-line)]">
+        <GitList title="Commits Not Pushed" count={repo.unpushed ?? 0}>
+          {repo.unpushed === null ? (
+            <p className="type-label-13 text-muted-foreground">No remote to push to.</p>
+          ) : repo.commits.length === 0 ? (
+            <p className="type-label-13 text-muted-foreground">Everything is pushed.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {repo.commits.map((subject, i) => (
+                <li key={i} className="flex min-w-0 items-center gap-2 type-label-13 text-text-2">
+                  <Icon name="commit" size={14} className="shrink-0 text-muted-foreground" />
+                  <span className="truncate">{subject || "No message"}</span>
+                </li>
+              ))}
+              {moreCommits > 0 && <li className="type-label-13 text-muted-foreground tabular-nums">{moreCommits} more</li>}
+            </ul>
+          )}
+        </GitList>
+        <GitList title="Changed Files" count={repo.changed}>
+          {repo.files.length === 0 ? (
+            <p className="type-label-13 text-muted-foreground">Nothing left uncommitted.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {repo.files.map((f) => (
+                <li key={f.path} className="flex min-w-0 items-center gap-3 type-label-13-mono">
+                  <span className="grow truncate text-text-2">{f.path}</span>
+                  <span className="shrink-0 text-muted-foreground tabular-nums">{fileLines(f)}</span>
+                </li>
+              ))}
+              {more > 0 && <li className="type-label-13 text-muted-foreground tabular-nums">{more} more</li>}
+            </ul>
+          )}
+        </GitList>
+      </div>
+    </Panel>
+  );
+}
+
+/** Focus, read-only: the Drift from the intention – the days since choosing, and how many of them
+ * had Activity (GLOSSARY.md § Focus). Focus is chosen in config.json for now. */
+function Focus({ project, now }: { project: ProjectData; now: Date }) {
+  const f = focusDrift(project, now);
+  return (
+    <Panel title="Focus">
+      {!f || !project.focusSince ? (
+        <None>Not in Focus. Focus is chosen in config.json for now.</None>
+      ) : (
+        <div className="flex items-center gap-4 px-4 py-4">
+          <Gauge value={f.active} max={f.days} label={`${f.active} of ${f.days} days with Activity`} />
+          <div className="flex min-w-0 flex-col gap-1">
+            <p className="type-label-14">
+              <strong>{f.active}</strong> of {f.days} {f.days === 1 ? "day" : "days"} had Activity
+              {f.capped && " in the last 30"}
+            </p>
+            <p className="type-label-13 text-muted-foreground">
+              In Focus since {new Date(project.focusSince).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+            </p>
+          </div>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+export function Project({ project }: { project: ProjectData }) {
+  const now = useNow();
+  return (
+    <div className="flex w-full flex-col gap-8 px-8 py-8">
+      <h1 className="sr-only">{project.name}</h1>
+      <WhereYouLeftOff project={project} now={now} />
+      <div className="grid grid-cols-1 items-start gap-8 xl:grid-cols-2">
+        <div className="flex min-w-0 flex-col gap-8">
+          <Issues project={project} now={now} />
+          <EarlierSessions project={project} now={now} />
+        </div>
+        <div className="flex min-w-0 flex-col gap-8">
+          <Git project={project} now={now} />
+          <Focus project={project} now={now} />
+        </div>
+      </div>
+    </div>
+  );
+}

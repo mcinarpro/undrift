@@ -46,6 +46,7 @@ export async function watchProjects(onProjects: (projects: Project[]) => void): 
 
 // The bridge checks the Project, Session and Issue against its own list before opening anything.
 export const resume = (path: string, id: string) => (inTauri ? invoke<void>("resume", { path, id }) : Promise.resolve());
+export const newSession = (path: string) => (inTauri ? invoke<void>("new_session", { path }) : Promise.resolve());
 export const start = (path: string, number: number) => (inTauri ? invoke<void>("start", { path, number }) : Promise.resolve());
 export const letGo = (path: string) => (inTauri ? invoke<void>("let_go", { path }) : Promise.resolve());
 export const undoLetGo = (path: string) => (inTauri ? invoke<void>("undo_let_go", { path }) : Promise.resolve());

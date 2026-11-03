@@ -1,10 +1,9 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Action } from "@/components/action";
-import { AreaSwatch, Empty, ProjectAvatar } from "@/components/bits";
-import { DriftStrip } from "@/components/drift-strip";
+import { Activity, AreaName, AreaSwatch, DEFAULT_BRANCHES, Diff, Empty, LIVE_BADGE, ProjectAvatar, STATUS_DOT, useNow, When } from "@/components/bits";
 import { Icon } from "@/components/icon";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { age, driftCells, figures, issuesByProject, looseEnds, status, touchedLast, type LooseEnd, type OpenPart, type Part, type Section as SectionName, type StatusName } from "@/lib/home";
+import { fileLines, figures, issuesByProject, looseEnds, status, touchedLast, type LooseEnd, type OpenPart, type Part, type Section as SectionName } from "@/lib/home";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store";
 import type { Issue, Project } from "@/types";
@@ -19,63 +18,8 @@ const GRID = "grid grid-cols-2 gap-4 2xl:grid-cols-3";
 // Geist's material at 12 px, the radius of DESIGN.md's Panels: at 6 px the grid read as boxes.
 const TILE = "flex min-w-0 flex-col gap-3 rounded-xl p-4 material-small";
 
-/** Relative times tick every minute (DESIGN.md § Layout), and a Session turns quiet on this clock. */
-function useNow(): Date {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 60_000);
-    return () => clearInterval(id);
-  }, []);
-  return now;
-}
-
-/** A Status as the Graph draws it – busy in the mark, waiting in the ink, quiet hollow – with its word. */
-const STATUS_DOT: Record<StatusName, string> = {
-  Busy: "bg-mark",
-  Waiting: "bg-foreground",
-  Quiet: "shadow-[inset_0_0_0_1.5px_var(--ud-muted)]",
-};
-
-/** A Session at work or waiting on you is what Home must not let slip by, so its Status is a Badge
- * and its card comes first in its section. A quiet one keeps the dot and the word. */
-// Geist's subtle Badge: blue's tint mixed into the surface, opaque (DESIGN.md § Colour).
-const LIVE_BADGE: Partial<Record<StatusName, string>> = {
-  Busy: "bg-[color-mix(in_oklab,var(--ud-accent)_12%,var(--ud-surface))] text-accent-text",
-  Waiting: "bg-alpha-200 text-foreground",
-};
-
 // Rows inside one card are separated by the edge colour on their top side.
 const ROW = "items-center gap-6 px-4 py-3 not-first:shadow-[0_-1px_0_0_var(--ud-line)]";
-
-function When({ iso, now }: { iso: string; now: Date }) {
-  return (
-    <time dateTime={iso} title={new Date(iso).toLocaleString("en-GB")} className="type-label-13 whitespace-nowrap text-muted-foreground tabular-nums">
-      {age(iso, now)}
-    </time>
-  );
-}
-
-function AreaName({ project }: { project: Project }) {
-  return (
-    <span className="flex shrink-0 items-center gap-1.5 type-label-13 text-muted-foreground">
-      <AreaSwatch color={project.area?.color} className="size-2.5" />
-      {project.area?.name ?? "Unsorted"}
-    </span>
-  );
-}
-
-function Diff({ project }: { project: Project }) {
-  const repo = project.repo;
-  if (!repo) return null;
-  const parts = [`${repo.changed} ${repo.changed === 1 ? "file" : "files"}`];
-  // An untracked file has no line count (repo.rs), so a diff of nothing says nothing.
-  if (repo.diff && repo.diff.insertions + repo.diff.deletions > 0) parts.push(`+${repo.diff.insertions} −${repo.diff.deletions}`);
-  if (repo.unpushed) parts.push(`${repo.unpushed} unpushed`);
-  return <span className="truncate type-label-13-mono text-text-2 tabular-nums">{parts.join(" · ")}</span>;
-}
-
-/** The default branch is where work happens unless said otherwise, so only another one is shown. */
-const DEFAULT_BRANCHES = ["main", "master"];
 
 /** The Project a Loose End belongs to, and the Status of its Session when one is open. */
 function LooseEndTop({ le, now }: { le: LooseEnd; now: Date }) {
@@ -98,19 +42,6 @@ function LooseEndTop({ le, now }: { le: LooseEnd; now: Date }) {
         </span>
       )}
     </header>
-  );
-}
-
-/** The Project's Drift strip with its active days written beside it. */
-function Activity({ project, now }: { project: Project; now: Date }) {
-  const days = project.activeDays.length;
-  return (
-    <div className="flex items-center gap-3">
-      <DriftStrip cells={driftCells(project.activeDays, now)} className="grow" />
-      <span className="shrink-0 type-label-13 text-muted-foreground tabular-nums">
-        {days} active {days === 1 ? "day" : "days"}
-      </span>
-    </div>
   );
 }
 
@@ -201,7 +132,7 @@ function Hero({ le, section, now }: { le: LooseEnd; section: SectionName; now: D
               <li key={f.path} className="flex min-w-0 items-center gap-3 type-label-13-mono">
                 <span className="grow truncate text-text-2">{f.path}</span>
                 <span className="shrink-0 text-muted-foreground tabular-nums">
-                  {f.insertions === null ? "new" : `+${f.insertions} −${f.deletions}`}
+                  {fileLines(f)}
                 </span>
               </li>
             ))}

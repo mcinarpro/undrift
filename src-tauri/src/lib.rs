@@ -27,6 +27,13 @@ async fn resume(shared: tauri::State<'_, bridge::Shared>, path: String, id: Stri
     terminal::resume(&session.cwd, &session.id)
 }
 
+/// New Session: a terminal in the Project's folder running `claude` with no prompt.
+#[tauri::command]
+async fn new_session(shared: tauri::State<'_, bridge::Shared>, path: String) -> Result<(), String> {
+    let project = project(&shared, &path)?;
+    terminal::new_session(&project.path)
+}
+
 /// Start: a terminal in the Project's folder running `claude` with the Issue as its first prompt.
 #[tauri::command]
 async fn start(shared: tauri::State<'_, bridge::Shared>, path: String, number: u32) -> Result<(), String> {
@@ -95,7 +102,7 @@ fn quit(app: AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![projects_now, resume, start, let_go, undo_let_go, rescan, nav_user, nav_user_avatar, quit])
+        .invoke_handler(tauri::generate_handler![projects_now, resume, new_session, start, let_go, undo_let_go, rescan, nav_user, nav_user_avatar, quit])
         .setup(|app| {
             bridge::start(app.handle().clone());
             tray(app)?;

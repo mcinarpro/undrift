@@ -47,13 +47,37 @@ is described here once it is built; until then this section holds what was decid
   Issue. With no Loose End, Geist's Empty State says *Nothing left half-done.* above the five
   Projects touched last, each with Resume.
 - **Projects**: every Project as Vercel's project card, filtered by Area – avatar, name, path,
-  status dot, last commit, branch · relative time · uncommitted, and the Drift strip.
+  the Focus marker, the group dot, last commit, branch · relative time · uncommitted, and the Drift
+  strip. The filter is a Segmented control – All, each Area in its rank, Unsorted – each with its
+  count, shown once there is more than one choice; it is kept while a Project page is open. Cards
+  are 6 px, two across, three from 1280 px, four from 1536 px, the Drifting first (GLOSSARY.md
+  § Drifting), then In Motion and Parked. A card opens its Project page.
 - **Project page**, shaped like Vercel's Project Overview: a **Where You Left Off** card – the Drift
-  strip, Drift, Last Activity, Area, Last Session, Last Prompt, the diff stat – with New Session and
-  Resume; then the Project's Issues, Earlier Sessions, Git and Focus.
+  strip, Drift, Last Activity, Area, Last Session with its Status when open, the diff stat, Last
+  Prompt – with the page's only primary Resume and New Session; then two columns from 1280 px: the
+  Project's Issues (each with Start) and Earlier Sessions (each with Resume) on the left, Git and
+  Focus on the right. Git says what was done and what is left – the branch, the GitHub repository,
+  the last commit, the **Commits Not Pushed** by subject, newest first, and the **Changed Files**
+  with `+n −n` or *new*. Focus is read-only: a Gauge of the days with Activity since the Project was
+  put in Focus. The breadcrumb's Area leads back to Projects filtered by it.
 - **Graph**: the Projects as a network (GLOSSARY.md), on a page of its own – a d3-force simulation
-  in SVG, a hub per Area in its colour, a node per Project ringed in its group's colour, a dot per
-  Session by Status. It is kept for two weeks of use and removed if it is not opened.
+  in SVG, a hub per Area in its colour, a node per Project ringed in its group's colour, a node per
+  open Session by Status – a 28 px disc with a robot glyph, busy in `accent` with a quarter ring
+  turning around it, waiting in `text`, quiet hollow – and an earlier Session as a small `alpha-600`
+  dot, on 1 px links in `line`. A legend
+  sits bottom left. Every node takes focus, and a click or Enter opens its panel on the right
+  instead of leaving the page – the one side panel in Undrift, since the Graph is read by moving
+  between its parts: a 360 px `surface` card at 12 px with `--ud-shadow-medium`, closed by its
+  Close, Esc or a click on the ground. A Project's panel holds its Drift strip, Drift, Last
+  Activity, Area, Changes, Last Session with its Status, Last Prompt and open Issues, then Resume,
+  New Session and Open Project; a Session's its Status, Last Turn, Project and Last Prompt, then
+  Resume; an Area's its Projects, the Drifting first, each opening its own panel. The selected
+  node wears a ring in `text`. The network fits the page beside the panel, never above 1:1; the
+  wheel or a pinch zooms around the pointer (¼× to 4×), dragging the ground pans and a
+  double-click fits it again, with Zoom Out, Fit and Zoom In bottom right for the keyboard. It
+  keeps its layout and its zoom across a refresh from the bridge and a visit to another page: only
+  a node or a link that comes or goes sets it moving again. It is kept for two weeks of
+  use and removed if it is not opened.
 - **Settings**: the notification switch, then what still lives only in `config.json`.
 - **First load**: while the bridge reads the Projects, the page is its own shape in Skeletons – none
   for a load under 200 ms, and at least 300 ms once shown.
@@ -169,8 +193,8 @@ the information.
 
 ## Shape and motion
 
-- The Graph is the one place that moves on its own: the network settles into place, a busy
-  Session's dot pulses, and sparks run from it to its Project and on to the Area. Under
+- The Graph is the one place that moves on its own: the network settles into place, a ring turns
+  around a busy Session as a spinner does, and sparks run from it to its Project and on to the Area. Under
   `prefers-reduced-motion` the layout settles at once and nothing moves.
 - Edges are a 1 px spread shadow (`edge` utility, `0 0 0 1px var(--ud-line)`), not `border`; the rail
   and the top bar use a one-sided shadow. A drop target being hovered gets a 2 px `accent` ring.

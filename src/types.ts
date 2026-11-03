@@ -38,6 +38,8 @@ export type FileChange = {
   path: string;
   insertions: number | null;
   deletions: number | null;
+  /** A file git does not know yet; the only one called *new*. */
+  untracked: boolean;
 };
 
 export type Repo = {
@@ -50,6 +52,8 @@ export type Repo = {
   diff: DiffStat | null;
   /** Commits ahead of the upstream; null when the branch has none. */
   unpushed: number | null;
+  /** The subjects of those commits, newest first, at most 50. */
+  commits: string[];
   /** `owner/name` of the `origin` remote when it is on GitHub. */
   github: string | null;
   /** The changed files, the most changed lines first, at most 50. */
