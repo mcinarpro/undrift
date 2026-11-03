@@ -68,6 +68,7 @@ type State = {
   start: (path: string, issue: number) => void;
   letGo: (path: string, name: string) => void;
   setArea: (path: string, area: { name: string; color: string } | null) => void;
+  setFocus: (path: string, on: boolean) => void;
 };
 
 export const useStore = create<State>((set) => ({
@@ -125,6 +126,8 @@ export const useStore = create<State>((set) => ({
       .catch((e) => failed("let go of the Loose End", e)),
   // The Badge and the rails follow with the list the bridge sends back on its next tick.
   setArea: (path, area) => void bridge.setArea(path, area).catch((e) => failed("file the Project", e)),
+  // A fourth Project is refused by the bridge, whose words – three at most – reach the toast.
+  setFocus: (path, on) => void bridge.setFocus(path, on).catch((e) => failed(on ? "put the Project in Focus" : "take the Project out of Focus", e)),
 }));
 
 // A Project that left the list – hidden, or its folder gone – closes its page for good, so it

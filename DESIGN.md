@@ -46,10 +46,12 @@ window. A view is described here once it is built; until then this section holds
   leaves its section for a 2×2 tile – its section and age, the Session title in `type-heading-24`,
   three lines of prompt, the Drift strip, its five most changed files (mono path, `+n −n` or *new*),
   how many more and the last commit's subject, then the page's only primary Resume, the diff stat and
-  its Issue count. Four 1×1 figure tiles sit beside it – Loose Ends, Lines Not Committed, Commits Not
+  its Issue count. Four 1×1 figure tiles sit beside it – Loose Ends, Focus, Commits Not
   Pushed, Sessions Open – each a `type-heading-32` number over its label, then where it comes from:
   ranked 6 px bars in `accent`, one hue, largest first, each named and counted beside it, the tail
-  past four folded into Other; Sessions Open lists the Projects with their Status instead. The other cards take a
+  past four folded into Other; Focus lists its Projects in the order chosen, each bar the share of
+  days with Activity since, *5 of 9 d* beside it, and says *Nothing in Focus* when empty; Sessions
+  Open lists the Projects with their Status instead. The other cards take a
   secondary Resume. Under them, Ready to Start: a card per Project – its Issues newest first, each `#N`,
   title and a tertiary Start on a row that takes `alpha-100` on hover – three per card until Show All, the Projects ordered by their newest
   Issue. With no Loose End, Geist's Empty State says *Nothing left half-done.* above the five
@@ -97,7 +99,8 @@ window. A view is described here once it is built; until then this section holds
   in the most pressing one's – with the actions at its end: the page's only primary button, a split
   **Resume** of the last Session whose menu holds New Session and Resume on each earlier Session of
   the last 7 days (*Last 7 Days*), or **New Session** with no Session yet, then a secondary
-  **Open on GitHub** when the repository is on GitHub. The name truncates first, so the actions
+  **Focus** – **Leave Focus** while it is in – and a secondary **Open on GitHub** when the
+  repository is on GitHub. The name truncates first, so the actions
   never wrap under it. Under that line, the GitHub repository's description in `type-copy-14`
   `text-2` when it has one. Then a **Where You Left Off** card, with no button – the Drift strip,
   Drift, Last Activity, Area, Last Session with its Status when open, the diff stat, Reads First

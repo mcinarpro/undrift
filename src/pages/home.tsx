@@ -4,7 +4,7 @@ import { Activity, AreaName, AreaSwatch, DEFAULT_BRANCHES, Diff, Empty, Hint, LI
 import { Icon } from "@/components/icon";
 import { Bar, useProjectsRead, useSkeleton } from "@/components/loading";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { fileLines, figures, issuesByProject, looseEnds, needsYou, status, touchedLast, type LooseEnd, type NeedRow, type OpenPart, type Part, type Section as SectionName } from "@/lib/home";
+import { fileLines, figures, issuesByProject, looseEnds, needsYou, status, touchedLast, type FocusPart, type LooseEnd, type NeedRow, type OpenPart, type Part, type Section as SectionName } from "@/lib/home";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store";
 import type { Issue, Project } from "@/types";
@@ -227,6 +227,30 @@ function Parts({ parts }: { parts: Part[] }) {
             <span className="block h-full rounded-r-[4px] bg-mark" style={{ width: `${(p.value / max) * 100}%` }} />
           </span>
           <span className="type-label-13 text-text-2 tabular-nums">{p.value.toLocaleString("en-GB")}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The Projects in Focus, in the order chosen, each with its share of days with Activity since –
+ * the same row as the ranked Parts, so the band reads as one. A name opens the Project page. */
+function FocusParts({ focus }: { focus: FocusPart[] }) {
+  if (focus.length === 0) return <p className="type-label-13 text-muted-foreground">Nothing in Focus. Choose up to three on a Project page.</p>;
+  return (
+    <ul className="flex flex-col gap-2">
+      {focus.map((f) => (
+        <li key={f.project.path} className="grid grid-cols-[minmax(0,4.5rem)_minmax(0,1fr)_auto] items-center gap-2 @min-[14rem]:grid-cols-[minmax(0,7rem)_minmax(0,1fr)_auto] @min-[14rem]:gap-3">
+          <span className="flex min-w-0 items-center gap-1.5 type-label-13 text-text-2">
+            <AreaSwatch color={f.project.area?.color} className="size-2" />
+            <ProjectLink project={f.project} />
+          </span>
+          <span aria-hidden="true" className="h-1.5">
+            <span className="block h-full rounded-r-[4px] bg-mark" style={{ width: `${(f.active / f.days) * 100}%` }} />
+          </span>
+          <span className="type-label-13 text-text-2 tabular-nums">
+            {f.active} of {f.days} d
+          </span>
         </li>
       ))}
     </ul>
@@ -555,8 +579,8 @@ export function Home() {
                 <FigureTile label="Loose Ends" total={fig.looseEnds.total}>
                   <Parts parts={fig.looseEnds.parts} />
                 </FigureTile>
-                <FigureTile label="Lines Not Committed" total={fig.lines.total}>
-                  <Parts parts={fig.lines.parts} />
+                <FigureTile label="Focus" total={fig.focus.length}>
+                  <FocusParts focus={fig.focus} />
                 </FigureTile>
                 <FigureTile label="Commits Not Pushed" total={fig.unpushed.total}>
                   <Parts parts={fig.unpushed.parts} />

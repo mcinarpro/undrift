@@ -1,3 +1,4 @@
+import { focusDrift } from "@/lib/projects";
 import type { FileChange, Issue, OpenSession, Project, Session } from "@/types";
 
 // What Home shows, worked out from the bridge's Projects. The bridge decides which Projects are
@@ -28,6 +29,7 @@ export function section(iso: string, now: Date): Section {
   return now.getTime() - t < 7 * DAY ? "This Week" : "Older";
 }
 
+/** The lines changed in a Project, which order the Loose Ends within a section. */
 const lines = (p: Project) => (p.repo?.diff ? p.repo.diff.insertions + p.repo.diff.deletions : 0);
 
 /** 0 for a Loose End whose Session is busy or waiting, so it comes first in its section. */
@@ -73,21 +75,31 @@ function ranked(parts: Part[]): Figure {
 /** An open Session as the Sessions Open tile lists it. */
 export type OpenPart = { label: string; color?: string; status: StatusName };
 
+/** A Project in Focus as the Focus tile lists it: the days since it was chosen, and how many of
+ * them had Activity (GLOSSARY.md § Focus). */
+export type FocusPart = { project: Project; days: number; active: number };
+
 /** The figures beside the big tile, each split by where it comes from, so a number says where as
- * well as how many: the Loose Ends by section, the lines and commits left by Project, and the
- * Sessions open now with their Status, the ones at work or waiting first. */
+ * well as how many: the Loose Ends by section, the Focus in the order chosen, the commits left
+ * by Project, and the Sessions open now with their Status, the ones at work or waiting first. */
 export function figures(
   groups: { section: Section; items: LooseEnd[] }[],
   projects: Project[],
   now: Date,
-): { looseEnds: Figure; lines: Figure; unpushed: Figure; open: OpenPart[] } {
+): { looseEnds: Figure; focus: FocusPart[]; unpushed: Figure; open: OpenPart[] } {
   const items = groups.flatMap((g) => g.items);
   const byProject = (value: (p: Project) => number) =>
     ranked(items.map((le) => ({ label: le.project.name, value: value(le.project), color: le.project.area?.color ?? null })));
   const order: Record<StatusName, number> = { Busy: 0, Waiting: 1, Quiet: 2 };
   return {
     looseEnds: ranked(groups.map((g) => ({ label: g.section, value: g.items.length }))),
-    lines: byProject(lines),
+    focus: projects
+      .filter((p) => p.focusSince)
+      .sort((a, b) => time(a.focusSince!) - time(b.focusSince!))
+      .flatMap((p) => {
+        const f = focusDrift(p, now);
+        return f ? [{ project: p, days: f.days, active: f.active }] : [];
+      }),
     unpushed: byProject((p) => p.repo?.unpushed ?? 0),
     open: projects
       .flatMap((p) => p.openSessions.map((o) => ({ label: p.name, color: p.area?.color, status: status(o, now) })))

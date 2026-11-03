@@ -15,8 +15,9 @@ Projects out of it.
 _Avoid_: Import, scan settings
 
 **Focus**:
-The one to three Projects Mehmet chose to push, each with the moment he chose it. Undrift measures
-the Drift from that intention: the days since choosing, and how many of them had Activity.
+The one to three Projects Mehmet chose to push, each with the moment he chose it, on its page.
+Undrift measures the Drift from that intention: the days since choosing, and how many of them had
+Activity.
 _Avoid_: Pin, favourite, star, active
 
 **Hide**:

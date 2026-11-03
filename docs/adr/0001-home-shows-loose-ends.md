@@ -5,4 +5,5 @@ Undrift opens on Home, a list of Loose Ends grouped by age, because its first sc
 to other work in the morning without closing them. The Graph, Lanes and Focus answered other
 questions and left the answer in a side panel, so the Graph moved to a page of its own and Focus and
 Lanes left the first screen. Making the Graph the first screen again would bring back the problem
-this decision fixed.
+this decision fixed. The Focus tile in Home's band (2026-11-03) is a figure beside the Loose Ends,
+like Commits Not Pushed, not a first screen of its own, so the decision stands.

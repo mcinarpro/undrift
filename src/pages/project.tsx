@@ -300,6 +300,7 @@ function NewAreaDialog({ open, onOpenChange, onCreate }: { open: boolean; onOpen
 function ProjectHeader({ project, rows, now }: { project: ProjectData; rows: OpenRow[]; now: Date }) {
   const repo = project.repo;
   const phase = useGitHubPhase(project);
+  const setFocus = useStore((s) => s.setFocus);
   return (
     <header className="flex min-w-0 flex-col gap-1">
       <ProjectBreadcrumb project={project} />
@@ -311,6 +312,9 @@ function ProjectHeader({ project, rows, now }: { project: ProjectData; rows: Ope
         {rows.length > 0 && <StatusMark status={rows[0].status} label={rows.length > 1 ? `${rows.length} Sessions open` : undefined} />}
         <div className="ml-auto flex shrink-0 items-center gap-2 pl-3">
           <ResumeAction project={project} now={now} />
+          <Action variant="secondary" size="medium" onClick={() => setFocus(project.path, !project.focusSince)}>
+            {project.focusSince ? "Leave Focus" : "Focus"}
+          </Action>
           {repo?.github && (
             <Action variant="secondary" size="medium" onClick={() => openExternal(`https://github.com/${repo.github}`).catch((e) => failed("open GitHub", e))}>
               <Icon name="profile" /> Open on GitHub
@@ -525,14 +529,14 @@ function Git({ project, now }: { project: ProjectData; now: Date }) {
   );
 }
 
-/** Focus, read-only: the Drift from the intention – the days since choosing, and how many of them
- * had Activity (GLOSSARY.md § Focus). Focus is chosen in config.json for now. */
+/** Focus: the Drift from the intention – the days since choosing, and how many of them had
+ * Activity (GLOSSARY.md § Focus). The header's Focus action puts the Project in or takes it out. */
 function Focus({ project, now }: { project: ProjectData; now: Date }) {
   const f = focusDrift(project, now);
   return (
     <Panel title="Focus">
       {!f || !project.focusSince ? (
-        <None>Not in Focus. Focus is chosen in config.json for now.</None>
+        <None>Not in Focus.</None>
       ) : (
         <div className="flex items-center gap-4 px-4 py-4">
           <Gauge value={f.active} max={f.days} label={`${f.active} of ${f.days} days with Activity`} />

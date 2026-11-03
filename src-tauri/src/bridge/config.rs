@@ -1,8 +1,8 @@
 //! Which folders are Projects (GLOSSARY.md § Discovery): every git checkout directly under a
 //! root (`~/workspace` by default), plus every folder a Session ran in that is not inside one.
-//! Hides take Projects out; Focus is read here and written by nothing yet; Areas are read here
-//! and written by `set_area`, from the Project page. The settings live in
-//! `~/.config/undrift/config.json`, reloaded when the file's mtime changes.
+//! Hides take Projects out; Focus and Areas are read here and written by `set_focus` and
+//! `set_area`, from the Project page. The settings live in `~/.config/undrift/config.json`,
+//! reloaded when the file's mtime changes.
 
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
@@ -12,6 +12,9 @@ use std::time::SystemTime;
 
 /// The Area palette (DESIGN.md § Colour, `--ud-area-*`): the only colours an Area can take.
 pub const AREA_COLORS: [&str; 5] = ["purple", "green", "pink", "teal", "gray"];
+
+/// How many Projects Focus holds (GLOSSARY.md § Focus): one to three, so it stays a choice.
+pub const MAX_FOCUS: usize = 3;
 
 #[derive(Deserialize, Clone, PartialEq, Debug)]
 #[serde(default, rename_all = "camelCase")]
@@ -80,10 +83,9 @@ pub fn set_area(project: &Path, area: Option<(&str, &str)>) -> std::io::Result<(
     set_area_in(&path(), project, area)
 }
 
-/// The file is edited as plain JSON, so the keys this module does not read survive the write. A
-/// missing or broken file is the defaults, as `reload_if_changed` reads it. The Project's path is
-/// stored as `~/…`, so the file travels between machines; it is matched through `expand`, so an
-/// absolute path written by hand is found too.
+/// The file is edited as plain JSON, so the keys this module does not read survive the write. The
+/// Project's path is stored as `~/…`, so the file travels between machines; it is matched through
+/// `expand`, so an absolute path written by hand is found too.
 fn set_area_in(file: &Path, project: &Path, area: Option<(&str, &str)>) -> std::io::Result<()> {
     if let Some((name, color)) = area {
         if name.trim().is_empty() {
@@ -93,7 +95,7 @@ fn set_area_in(file: &Path, project: &Path, area: Option<(&str, &str)>) -> std::
             return Err(std::io::Error::other(format!("not an Area colour: {color}")));
         }
     }
-    let mut root: Map<String, Value> = std::fs::read_to_string(file).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+    let mut root = read_root(file);
     let mut areas = match root.remove("areas") {
         Some(Value::Array(areas)) => areas,
         _ => Vec::new(),
@@ -123,6 +125,44 @@ fn set_area_in(file: &Path, project: &Path, area: Option<(&str, &str)>) -> std::
     areas.retain(|a| a.get("projects").and_then(Value::as_array).is_some_and(|p| !p.is_empty()));
     root.insert("areas".into(), Value::Array(areas));
     super::write_atomic(file, &serde_json::to_vec_pretty(&root)?)
+}
+
+/// Puts `project` in Focus at `since`, or takes it out with `None` (GLOSSARY.md § Focus). The
+/// bridge sees the file's new mtime on its next tick, as after a hand edit.
+pub fn set_focus(project: &Path, since: Option<&str>) -> std::io::Result<()> {
+    set_focus_in(&path(), project, since)
+}
+
+/// Edited as `set_area_in` does, so the other keys survive and the path is stored as `~/…`. A
+/// Project already in Focus keeps the moment it was chosen; the array's order is the order of
+/// choosing, so a new one goes last.
+fn set_focus_in(file: &Path, project: &Path, since: Option<&str>) -> std::io::Result<()> {
+    let mut root: Map<String, Value> = read_root(file);
+    let mut focus = match root.remove("focus") {
+        Some(Value::Array(focus)) => focus,
+        _ => Vec::new(),
+    };
+    let at = focus.iter().position(|f| f.get("path").and_then(Value::as_str).is_some_and(|p| expand(p) == project));
+    match (since, at) {
+        (Some(_), Some(_)) | (None, None) => return Ok(()),
+        (Some(since), None) => {
+            if focus.len() >= MAX_FOCUS {
+                return Err(std::io::Error::other(format!("Focus holds {MAX_FOCUS} Projects at most")));
+            }
+            focus.push(json!({ "path": short(project), "since": since }));
+        }
+        (None, Some(i)) => {
+            focus.remove(i);
+        }
+    }
+    root.insert("focus".into(), Value::Array(focus));
+    super::write_atomic(file, &serde_json::to_vec_pretty(&root)?)
+}
+
+/// The file as plain JSON; a missing or broken file is the defaults, as `reload_if_changed`
+/// reads it.
+fn read_root(file: &Path) -> Map<String, Value> {
+    std::fs::read_to_string(file).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
 }
 
 /// `~/…` for a path under the home folder, the path itself otherwise.
@@ -268,6 +308,38 @@ mod tests {
         assert_eq!(areas_of(&file), vec![("Tools".into(), vec!["~/workspace/undrift".into()])]);
         let root: Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
         assert_eq!(root["areas"][0]["color"], "teal");
+    }
+
+    fn focus_of(file: &Path) -> Vec<(String, String)> {
+        let root: Value = serde_json::from_str(&std::fs::read_to_string(file).unwrap()).unwrap();
+        root["focus"].as_array().unwrap().iter().map(|f| (f["path"].as_str().unwrap().to_owned(), f["since"].as_str().unwrap().to_owned())).collect()
+    }
+
+    #[test]
+    fn focus_is_put_kept_and_left_in_the_order_chosen() {
+        let file = temp("focus");
+        let home = dirs::home_dir().unwrap();
+        let undrift = home.join("workspace/undrift");
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(&file, json!({ "terminal": "", "focus": [{ "path": home.join("workspace/vps").to_str().unwrap(), "since": "2026-11-01T06:00:00+01:00" }] }).to_string()).unwrap();
+        set_focus_in(&file, &undrift, Some("2026-11-03T06:00:00+01:00")).unwrap();
+        set_focus_in(&file, &undrift, Some("2026-11-04T06:00:00+01:00")).unwrap();
+        assert_eq!(focus_of(&file), vec![(home.join("workspace/vps").to_str().unwrap().to_owned(), "2026-11-01T06:00:00+01:00".into()), ("~/workspace/undrift".into(), "2026-11-03T06:00:00+01:00".into())]);
+        set_focus_in(&file, &home.join("workspace/vps"), None).unwrap();
+        assert_eq!(focus_of(&file), vec![("~/workspace/undrift".into(), "2026-11-03T06:00:00+01:00".into())]);
+        let root: Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+        assert_eq!(root["terminal"], "");
+    }
+
+    #[test]
+    fn focus_holds_three_projects_at_most() {
+        let file = temp("focus-max");
+        let home = dirs::home_dir().unwrap();
+        for name in ["a", "b", "c"] {
+            set_focus_in(&file, &home.join(name), Some("2026-11-03T06:00:00+01:00")).unwrap();
+        }
+        assert!(set_focus_in(&file, &home.join("d"), Some("2026-11-03T06:00:00+01:00")).is_err());
+        assert_eq!(focus_of(&file).len(), 3);
     }
 
     #[test]
