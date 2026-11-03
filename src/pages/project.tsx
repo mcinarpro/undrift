@@ -1,26 +1,14 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { openExternal } from "@/bridge";
 import { Action, SplitAction } from "@/components/action";
-import { Activity, AreaName, AreaSwatch, Badge, Diff, Field, Gauge, GroupBadge, Hint, ProjectAvatar, StatusMark, useNow, When } from "@/components/bits";
+import { Activity, Diff, Field, Gauge, GroupBadge, Hint, ProjectAvatar, StatusMark, useNow, When } from "@/components/bits";
 import { Icon } from "@/components/icon";
 import { Bar, useSkeleton } from "@/components/loading";
 import { failed } from "@/components/toast";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
+import { DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { fileLines, status } from "@/lib/home";
-import { AREA_COLORS, areaFilters, drift, earlierSessions, filterKey, focusDrift, group, lastSession, openRows, recentSessions, type AreaColor, type OpenRow } from "@/lib/projects";
+import { drift, earlierSessions, focusDrift, group, lastSession, openRows, recentSessions, type OpenRow } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store";
 import type { Project as ProjectData } from "@/types";
@@ -29,21 +17,20 @@ import type { Project as ProjectData } from "@/types";
 // Project is and its actions, then Where You Left Off answers "what was done here, and what is
 // left?", then the Sessions open, the Issues, the Earlier Sessions, Git and Focus.
 
-/** The page's breadcrumb, Area / Project: the Area leads back to Projects filtered by it. */
+/** The page's breadcrumb, Projects / Project: Projects leads back to the page as it was left. */
 function ProjectBreadcrumb({ project }: { project: ProjectData }) {
-  const setAreaFilter = useStore((s) => s.setAreaFilter);
-  const area = project.area;
+  const go = useStore((s) => s.go);
   return (
-    // -ml-2 takes back the Area's padding, so its words line up with the title below.
+    // -ml-2 takes back the link's padding, so its words line up with the title below.
     <Breadcrumb aria-label="Breadcrumb" className="-ml-2 min-w-0">
       <BreadcrumbList className="flex-nowrap gap-1 type-label-14">
         <BreadcrumbItem className="min-w-0">
-          {/* A page here, not a URL: the Area is a button that sets the Projects filter. */}
+          {/* A page here, not a URL: Projects is a button. */}
           <BreadcrumbLink
-            render={<button type="button" onClick={() => setAreaFilter(area ? { kind: "area", name: area.name } : { kind: "unsorted" })} />}
+            render={<button type="button" onClick={() => go("projects")} />}
             className="flex h-8 min-w-0 items-center rounded-md px-2 text-text-2 duration-150 hover:bg-alpha-100 hover:text-foreground"
           >
-            <span className="truncate">{area?.name ?? "Unsorted"}</span>
+            Projects
           </BreadcrumbLink>
         </BreadcrumbItem>
         {/* Vercel's slash rather than the generated chevron. */}
@@ -93,9 +80,6 @@ function WhereYouLeftOff({ project, now }: { project: ProjectData; now: Date }) 
             <span className="type-label-13-mono text-text-2 tabular-nums">{drift(project, now)}</span>
           </Field>
           <Field label="Last Activity">{project.lastActivity ? <When iso={project.lastActivity} now={now} /> : <span className="text-muted-foreground">None</span>}</Field>
-          <Field label="Area">
-            <AreaName project={project} />
-          </Field>
           <Field label="Last Session" className="col-span-2">
             {last ? <span className="truncate">{last.session.title}</span> : <span className="text-muted-foreground">No Session yet</span>}
             {st && <StatusMark status={st} />}
@@ -187,113 +171,6 @@ function ResumeAction({ project, now }: { project: ProjectData; now: Date }) {
   );
 }
 
-/** The Area as a Badge beside the title – its swatch and its name, Unsorted in the Parked grey –
- * and the menu that files the Project (GLOSSARY.md § Area): every Area there is, Unsorted, then
- * New Area…. The radio's values are the rail's filter keys, so a name is never mistaken for a kind. */
-function AreaBadge({ project }: { project: ProjectData }) {
-  const projects = useStore((s) => s.projects) ?? [];
-  const setArea = useStore((s) => s.setArea);
-  const [creating, setCreating] = useState(false);
-  const areas = areaFilters(projects).filter((o) => o.filter.kind === "area");
-  const current = filterKey(project.area ? { kind: "area", name: project.area.name } : { kind: "unsorted" });
-  const choose = (key: string) => {
-    const chosen = areas.find((o) => filterKey(o.filter) === key);
-    setArea(project.path, chosen?.color ? { name: chosen.label, color: chosen.color } : null);
-  };
-  return (
-    <>
-      <DropdownMenu>
-        {/* A Geist select: the chevron shows on hover, and the trigger draws the double ring itself. */}
-        <DropdownMenuTrigger
-          aria-label={`Area: ${project.area?.name ?? "Unsorted"}`}
-          className="group rounded-full transition-shadow duration-150 focus-visible:shadow-[0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--ud-focus)]"
-        >
-          <Badge className="bg-secondary text-text-2 group-hover:bg-alpha-200">
-            <AreaSwatch color={project.area?.color} className="size-2" />
-            {project.area?.name ?? "Unsorted"}
-            <Icon name="chevron" className="-mr-1 size-3 text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-aria-expanded:opacity-100" />
-          </Badge>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-56 rounded-xl p-1 ring-0 shadow-(--ud-shadow-menu)">
-          <DropdownMenuRadioGroup value={current} onValueChange={choose}>
-            {areas.map((o) => (
-              <DropdownMenuRadioItem key={o.label} value={filterKey(o.filter)} className={MENU_ROW}>
-                <AreaSwatch color={o.color} className="size-2.5" />
-                {o.label}
-              </DropdownMenuRadioItem>
-            ))}
-            <DropdownMenuRadioItem value="unsorted" className={MENU_ROW}>
-              <AreaSwatch color={undefined} className="size-2.5" />
-              Unsorted
-            </DropdownMenuRadioItem>
-          </DropdownMenuRadioGroup>
-          <DropdownMenuSeparator className="my-1" />
-          <DropdownMenuItem onClick={() => setCreating(true)} className={MENU_ROW}>
-            New Area…
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <NewAreaDialog open={creating} onOpenChange={setCreating} onCreate={(name, color) => setArea(project.path, { name, color })} />
-    </>
-  );
-}
-
-/** New Area…: a name and a colour from the Area palette, on Geist's modal material as Find is. A
- * name already in use files the Project under that Area – the bridge finds it by name. */
-function NewAreaDialog({ open, onOpenChange, onCreate }: { open: boolean; onOpenChange: (open: boolean) => void; onCreate: (name: string, color: AreaColor) => void }) {
-  const [name, setName] = useState("");
-  const [color, setColor] = useState<AreaColor>(AREA_COLORS[0]);
-  const ready = name.trim().length > 0;
-  const create = () => {
-    if (!ready) return;
-    onCreate(name.trim(), color);
-    onOpenChange(false);
-    setName("");
-  };
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false} className="gap-5 rounded-xl bg-card p-5 ring-0 shadow-(--ud-shadow-modal) sm:max-w-sm">
-        <DialogHeader className="gap-1 text-left">
-          <DialogTitle className="type-heading-16">New Area</DialogTitle>
-          <DialogDescription className="type-copy-14 text-text-2">A theme to file Projects under. It exists while it holds one.</DialogDescription>
-        </DialogHeader>
-        <form
-          className="flex flex-col gap-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            create();
-          }}
-        >
-          <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="Area name" className="h-9 edge border-0 bg-card px-3 focus-visible:ring-0 focus-visible:shadow-[0_0_0_1px_var(--ud-line),0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--ud-focus)]" />
-          <div role="radiogroup" aria-label="Colour" className="flex gap-1">
-            {AREA_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                role="radio"
-                aria-checked={color === c}
-                aria-label={c}
-                onClick={() => setColor(c)}
-                className={cn("flex size-8 items-center justify-center rounded-md transition-colors duration-150 hover:bg-alpha-100", color === c && "bg-alpha-200")}
-              >
-                <AreaSwatch color={c} className="size-3.5" />
-              </button>
-            ))}
-          </div>
-          <DialogFooter className="gap-2">
-            <Action variant="secondary" size="medium" type="button" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Action>
-            <Action variant="primary" size="medium" type="submit" disabled={!ready}>
-              Create
-            </Action>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 /** The page header, as on Vercel's Project Overview: who the Project is and what runs on it on the
  * left, its actions on the right. The name truncates before anything else gives way, so the
  * actions never wrap under it. */
@@ -305,9 +182,8 @@ function ProjectHeader({ project, rows, now }: { project: ProjectData; rows: Ope
     <header className="flex min-w-0 flex-col gap-1">
       <ProjectBreadcrumb project={project} />
       <div className="flex min-w-0 items-center gap-3">
-        <ProjectAvatar name={project.name} color={project.area?.color} />
+        <ProjectAvatar name={project.name} />
         <h1 className="min-w-0 truncate type-heading-24">{project.name}</h1>
-        <AreaBadge project={project} />
         {/* The most pressing Status leads, so two Sessions open wear Busy's colour when one is busy. */}
         {rows.length > 0 && <StatusMark status={rows[0].status} label={rows.length > 1 ? `${rows.length} Sessions open` : undefined} />}
         <div className="ml-auto flex shrink-0 items-center gap-2 pl-3">

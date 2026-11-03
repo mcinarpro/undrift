@@ -73,17 +73,8 @@ async fn undo_let_go(shared: tauri::State<'_, bridge::Shared>, path: String) -> 
     Ok(())
 }
 
-/// Area: files the Project under an Area, or under none, in `config.json`. The bridge sees the
-/// file's new mtime on its next tick and sends the list again, so no rebuild is asked for.
-#[tauri::command]
-async fn set_area(shared: tauri::State<'_, bridge::Shared>, path: String, name: Option<String>, color: Option<String>) -> Result<(), String> {
-    let project = project(&shared, &path)?;
-    let area = name.as_deref().zip(color.as_deref());
-    bridge::config::set_area(std::path::Path::new(&project.path), area).map_err(|e| e.to_string())
-}
-
 /// Focus: puts the Project in Focus now, or takes it out. Three at most – the bridge refuses the
-/// fourth, and the window shows its words. The mtime does the rebuild, as for Areas.
+/// fourth, and the window shows its words. The mtime does the rebuild, as for Let Go, but through the file.
 #[tauri::command]
 async fn set_focus(shared: tauri::State<'_, bridge::Shared>, path: String, on: bool) -> Result<(), String> {
     let project = project(&shared, &path)?;
@@ -137,7 +128,7 @@ fn quit(app: AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![projects_now, resume, new_session, start, let_go, undo_let_go, set_area, set_focus, rescan, nav_user, nav_user_avatar, quit])
+        .invoke_handler(tauri::generate_handler![projects_now, resume, new_session, start, let_go, undo_let_go, set_focus, rescan, nav_user, nav_user_avatar, quit])
         .setup(|app| {
             bridge::start(app.handle().clone());
             tray(app)?;

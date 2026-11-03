@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Action } from "@/components/action";
-import { Activity, AreaName, DEFAULT_BRANCHES, Diff, Empty, Gauge, Hint, LIVE_BADGE, ProjectAvatar, STATUS_DOT, useNow, When } from "@/components/bits";
+import { Activity, DEFAULT_BRANCHES, Diff, Empty, Gauge, Hint, LIVE_BADGE, ProjectAvatar, STATUS_DOT, useNow, When } from "@/components/bits";
 import { Icon } from "@/components/icon";
 import { Bar, useProjectsRead, useSkeleton } from "@/components/loading";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -58,9 +58,8 @@ function LooseEndTop({ le, now }: { le: LooseEnd; now: Date }) {
   const st = open && status(open, now);
   return (
     <header className="flex min-w-0 items-center gap-2">
-      <ProjectAvatar name={project.name} color={project.area?.color} size={24} />
+      <ProjectAvatar name={project.name} size={24} />
       <ProjectLink project={project} />
-      <AreaName project={project} />
       <span className="ml-auto flex shrink-0 items-center gap-2">
         {st && (
           <span
@@ -208,7 +207,7 @@ function FocusTile({ focus }: { focus: FocusPart[] }) {
               <Gauge value={f.active} max={f.days} label={`${f.active} of ${f.days} days with Activity`} />
               <div className="flex min-w-0 flex-col gap-0.5">
                 <span className="flex min-w-0 items-center gap-2 type-label-14 font-medium">
-                  <ProjectAvatar name={f.project.name} color={f.project.area?.color} size={20} />
+                  <ProjectAvatar name={f.project.name} size={20} />
                   <ProjectLink project={f.project} />
                 </span>
                 <span className="type-label-13 text-muted-foreground tabular-nums">
@@ -259,7 +258,7 @@ function ProjectIssues({ project, issues, all }: { project: Project; issues: Iss
   return (
     <article className={TILE}>
       <header className="flex min-w-0 items-center gap-2">
-        <ProjectAvatar name={project.name} color={project.area?.color} size={24} />
+        <ProjectAvatar name={project.name} size={24} />
         <ProjectLink project={project} as="h3" />
         <span className="type-label-13 text-muted-foreground tabular-nums">{issues.length}</span>
         <span className="ml-auto flex">
@@ -324,7 +323,7 @@ function NeedItem({ row, now }: { row: NeedRow; now: Date }) {
         onClick={() => openProject(project.path)}
         className="flex w-full min-w-0 items-center gap-3 rounded-md px-2 py-2 text-left transition-colors duration-150 hover:bg-alpha-100"
       >
-        <ProjectAvatar name={project.name} color={project.area?.color} size={24} />
+        <ProjectAvatar name={project.name} size={24} />
         <span className="flex min-w-0 grow flex-col">
           <span className="truncate type-label-13 text-muted-foreground">{project.name}</span>
           <span className={cn("truncate type-label-14", !title && "text-muted-foreground")}>{title ?? "No title yet"}</span>
@@ -399,11 +398,10 @@ function NothingLeft({ projects, now }: { projects: Project[]; now: Date }) {
           {recent.map(({ project, session }) => (
             <div key={project.path} className={cn("grid grid-cols-[minmax(0,1fr)_auto_110px_auto]", ROW)}>
               <span className="flex min-w-0 items-center gap-3">
-                <ProjectAvatar name={project.name} color={project.area?.color} size={28} />
+                <ProjectAvatar name={project.name} size={28} />
                 <ProjectLink project={project} />
               </span>
-              <AreaName project={project} />
-              <When iso={session.lastActivity} now={now} />
+                      <When iso={session.lastActivity} now={now} />
               <Action variant="secondary" size="small" onClick={() => resume(project.path, session.id)}>
                 <Icon name="resume" /> Resume
               </Action>

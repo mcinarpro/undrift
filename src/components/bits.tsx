@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type ReactElement, type ReactNode } from "react";
 import { DriftStrip } from "@/components/drift-strip";
 import { Kbd } from "@/components/ui/kbd";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -37,15 +37,6 @@ export function When({ iso, now }: { iso: string; now: Date }) {
     <time dateTime={iso} title={new Date(iso).toLocaleString("en-GB")} className="type-label-13 whitespace-nowrap text-muted-foreground tabular-nums">
       {age(iso, now)}
     </time>
-  );
-}
-
-export function AreaName({ project }: { project: Project }) {
-  return (
-    <span className="flex shrink-0 items-center gap-1.5 type-label-13 text-muted-foreground">
-      <AreaSwatch color={project.area?.color} className="size-2.5" />
-      {project.area?.name ?? "Unsorted"}
-    </span>
   );
 }
 
@@ -193,24 +184,13 @@ export function Key({ children }: { children: ReactNode }) {
   return <Kbd className="rounded-sm bg-card text-text-2 shadow-[0_0_0_1px_var(--ud-alpha-400)]">{children}</Kbd>;
 }
 
-/** A small square in an Area's colour – the Parked grey for Unsorted. */
-export function AreaSwatch({ color, className }: { color: string | undefined; className?: string }) {
-  const tint = color ? ({ "--area": `var(--ud-area-${color})` } as CSSProperties) : undefined;
-  return <span aria-hidden="true" style={tint} className={cn("size-3 shrink-0 rounded-[3px]", color ? "bg-(--area)" : "bg-parked", className)} />;
-}
-
-/** A Project's avatar: its initials on a raised square, as Vercel shows a framework icon. In an
- * Area, the square takes a light tint of the Area's colour, so a Project's theme shows at a glance. */
-export function ProjectAvatar({ name, color, size = 32 }: { name: string; color?: string; size?: number }) {
-  const tint = color ? ({ "--area": `var(--ud-area-${color})` } as CSSProperties) : undefined;
+/** A Project's avatar: its initials on a raised square, as Vercel shows a framework icon. */
+export function ProjectAvatar({ name, size = 32 }: { name: string; size?: number }) {
   return (
     <span
       aria-hidden="true"
-      style={{ width: size, height: size, fontSize: size * 0.38, ...tint }}
-      className={cn(
-        "flex shrink-0 items-center justify-center rounded-md font-semibold text-text-2 edge",
-        color ? "bg-[color-mix(in_oklab,var(--area)_18%,var(--ud-surface))]" : "bg-secondary",
-      )}
+      style={{ width: size, height: size, fontSize: size * 0.38 }}
+      className="flex shrink-0 items-center justify-center rounded-md bg-secondary font-semibold text-text-2 edge"
     >
       {monogram(name)}
     </span>

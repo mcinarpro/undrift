@@ -81,14 +81,6 @@ export type ReadsFirst = {
   files: string[];
 };
 
-/** The Area a Project is filed under. */
-export type AreaRef = {
-  name: string;
-  color: string;
-  /** Its place among the Areas, from 0. */
-  rank: number;
-};
-
 export type Project = {
   /** Absolute path, the Project's identity. */
   path: string;
@@ -97,8 +89,6 @@ export type Project = {
   name: string;
   /** When it was put in Focus (ISO timestamp); null when it is not in Focus. */
   focusSince: string | null;
-  /** The Area it is filed under; null when it is Unsorted. */
-  area: AreaRef | null;
   repo: Repo | null;
   /** Local dates (YYYY-MM-DD) with Activity in the last 30 days, oldest first. */
   activeDays: string[];

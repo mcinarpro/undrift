@@ -63,9 +63,6 @@ export const letGo = (path: string) => (inTauri ? invoke<void>("let_go", { path 
 export const undoLetGo = (path: string) => (inTauri ? invoke<void>("undo_let_go", { path }) : Promise.resolve());
 /** Puts the Project in Focus, or takes it out; the bridge refuses a fourth. */
 export const setFocus = (path: string, on: boolean) => (inTauri ? invoke<void>("set_focus", { path, on }) : Promise.resolve());
-/** Files the Project under an Area – a name and a colour of the Area palette – or under none. */
-export const setArea = (path: string, area: { name: string; color: string } | null) =>
-  inTauri ? invoke<void>("set_area", { path, name: area?.name ?? null, color: area?.color ?? null }) : Promise.resolve();
 
 export const quit = () => (inTauri ? invoke<void>("quit") : Promise.resolve());
 

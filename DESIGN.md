@@ -28,7 +28,7 @@ window. A view is described here once it is built; until then this section holds
   resumes), the pages and the actions.
 - **Home**, the first page (ADR 0001): the Loose Ends in three sections – Last Night (since 18:00 the
   day before), This Week, Older – newest first; within a section a busy or waiting Session first, then the biggest diff. Each shows
-  its Project and Area, the last Session's title and last prompt, files changed with +/− (left out
+  its Project, the last Session's title and last prompt, files changed with +/− (left out
   when no tracked line changed), the branch unless it is `main` or `master`, how long ago it was left
   and the Status of its Session when one is open. Each section is a grid of `material-small` cards,
   12 px, two across and three from a 1536 px window, filling its column. A card leads with what the
@@ -72,12 +72,9 @@ window. A view is described here once it is built; until then this section holds
   so in a tile under 224 px its part names take 72 px instead of 112 and leave the bars room.
 - **Projects**: the page's own rail of filters on the left, then every Project as Vercel's project
   card or as a row. The **rail** (§ Components) holds Groups – All, then In Motion, Drifting,
-  Parked, each with its dot, then Loose Ends and Focus – then Areas, each with its swatch in its
-  rank, then Unsorted. One choice per section, and the two combine (*Drifting* in *Mobile*); All
-  clears both. Each count says what choosing it would show, so it counts within the other
-  section's choice. The choices are kept while a Project page is open. A group's row stays at 0,
-  and choosing it shows an Empty State that says so (*No Project in Mobile is in Focus.*) with Show
-  All; an Area that no Project holds any more leaves the rail, and its choice falls back to All.
+  Parked, each with its dot, then Loose Ends and Focus. One choice; All clears it. Each count says
+  what choosing it would show. The choice is kept while a Project page is open. A group's row stays
+  at 0, and choosing it shows an Empty State that says so (*No Project is in Focus.*) with Show All.
   The page header holds the title and *n Projects* with the order in words, and on the
   right **Sort** – a secondary small button naming the order, opening Drift (the Drifting first,
   GLOSSARY.md § Drifting, then In Motion and Parked), Last Activity and Name – then Grid and List as
@@ -88,14 +85,11 @@ window. A view is described here once it is built; until then this section holds
   then the last commit, branch · relative time · `+n −n` (the files changed when no tracked line
   did) · open Issues, and the Drift strip. Cards are two across, three once the page beside the rail
   is 1120 px wide, four from 1472 px, so a card keeps at least 360 px. A **row** – avatar, name and
-  path, Area, the group Badge, branch, `+n −n`, last Activity – sits on columns shared by every row
+  path, the group Badge, branch, `+n −n`, last Activity – sits on columns shared by every row
   of one 6 px card, takes `alpha-100` on hover, and opens its Project page, as a card does.
 - **Project page**, shaped like Vercel's Project Overview. Its page header holds the breadcrumb,
-  *Area / Project*, whose Area leads back to Projects filtered by it; then one line – the 32 px
-  avatar, the name as the `h1` in `type-heading-24`, the Area as a Badge (its swatch and name on
-  `raised` in `text-2`; a chevron on hover, and it opens a menu of the Areas, Unsorted and *New
-  Area…*, which asks for a name and a colour from the Area palette in a modal) and, while a
-  Session is open, its Status as on Home, or *2 Sessions open*
+  *Projects / Project*, whose Projects leads back to the page; then one line – the 32 px
+  avatar, the name as the `h1` in `type-heading-24` and, while a Session is open, its Status as on Home, or *2 Sessions open*
   in the most pressing one's – with the actions at its end: the page's only primary button, a split
   **Resume** of the last Session whose menu holds New Session and Resume on each earlier Session of
   the last 7 days (*Last 7 Days*), or **New Session** with no Session yet, then a secondary
@@ -103,7 +97,7 @@ window. A view is described here once it is built; until then this section holds
   repository is on GitHub. The name truncates first, so the actions
   never wrap under it. Under that line, the GitHub repository's description in `type-copy-14`
   `text-2` when it has one. Then a **Where You Left Off** card, with no button – the Drift strip,
-  Drift, Last Activity, Area, Last Session with its Status when open, the diff stat, Reads First
+  Drift, Last Activity, Last Session with its Status when open, the diff stat, Reads First
   as a size with the files counted in its tooltip, Last Prompt;
   then two columns from 1280 px: **Sessions Open** while a Session is open – a row each, the
   Session's title, its Status, since when and *terminal* or *desktop*, and no button, since it runs
@@ -113,30 +107,29 @@ window. A view is described here once it is built; until then this section holds
   with `+n −n` or *new*. Focus is read-only: a Gauge of the days with Activity since the Project was
   put in Focus.
 - **Graph**: the Projects as a network (GLOSSARY.md), on a page of its own under its title – a d3-force simulation
-  in SVG, a hub per Area in its colour, a node per Project ringed in its group's colour, a node per
+  in SVG, one hub in `parked`, a node per Project ringed in its group's colour, a node per
   open Session by Status – a 28 px disc with a robot glyph, busy in `accent` with a quarter ring
   turning around it, waiting in `text`, quiet hollow – and an earlier Session as a small `alpha-600`
   dot, on 1 px links in `line`. An open Session wears its title beside its dot – `type-label-12` in
   `text-2` on a `surface` chip edged in `line`, cut at 28 characters, above every node – and an
   earlier one stays unlabelled. The page's own **rail** (§ Components) sits on the left, the title
-  and the network beside it: **Loose Ends** – a row per Loose End, its Area swatch, Project and age
+  and the network beside it: **Loose Ends** – a row per Loose End, its Project and age
   in `type-label-12` `muted` over the Session's title, and a tertiary icon Resume (*Resume* in its
-  tooltip) – then **Areas** – each with its swatch and its count of Projects, then Unsorted – then
-  **Sessions** – Busy, Waiting, Quiet and Earlier, each with its dot and its count. A row under the
-  pointer or the focus lights its part of the network – a Loose End its Project and Sessions, an
-  Area its hub and Projects, a Status its Sessions and their Projects – and fades every other node
+  tooltip) – then **Sessions** – Busy, Waiting, Quiet and Earlier, each with its dot and its count. A row under the
+  pointer or the focus lights its part of the network – a Loose End its Project and Sessions, a
+  Status its Sessions and their Projects – and fades every other node
   and link to 30% over 150 ms, at once under reduced motion; a row that lights nothing, as a Status
-  at 0, fades nothing. A Loose End or an
-  Area opens its node's panel, as a click on the node does, and is current while it is open; a
+  at 0, fades nothing. A Loose End opens its node's panel, as a click on the node does, and is
+  current while it is open; a
   Status has no panel, so choosing it keeps its part lit until it is chosen again, Esc or a click on
   the ground. A legend sits bottom left with what the rail does not explain: the Project rings and
   the links. Every node takes focus, and a click or Enter opens its panel on the right
   instead of leaving the page – the one side panel in Undrift, since the Graph is read by moving
   between its parts: a 360 px `surface` card at 12 px with `--ud-shadow-medium`, closed by its
   Close, Esc or a click on the ground. A Project's panel holds its Drift strip, Drift, Last
-  Activity, Area, Changes, Last Session with its Status, Last Prompt and open Issues, then Resume,
+  Activity, Changes, Last Session with its Status, Last Prompt and open Issues, then Resume,
   New Session and Open Project; a Session's its whole title, Status, Last Turn, Project and Last Prompt, then
-  Resume; an Area's its Projects, the Drifting first, each opening its own panel. The selected
+  Resume; the hub's every Project, the Drifting first, each opening its own panel. The selected
   node wears a ring in `text`. The network fits the page beside the panel, never above 1:1; the
   wheel or a pinch zooms around the pointer (¼× to 4×), dragging the ground pans and a
   double-click fits it again, with Zoom Out, Fit and Zoom In bottom right for the keyboard. It
@@ -190,7 +183,6 @@ backgrounds = `raised`, `muted-foreground` = `muted`, `border` = `line`, `ring` 
 | `drifting` | `#ffb224` | `#ffb224` | amber-700 · the Drifting dot, the Drifting Badge's tint |
 | `drifting-text` | `#a35200` | `#f2a20d` | amber-900 · the Drifting Badge's word – 5.1 / 7.3:1 on its tint |
 | `parked` | `#a8a8a8` | `#878787` | gray-600 · the Parked dot |
-| `area-purple` · `area-green` · `area-pink` · `area-teal` · `area-gray` | `#8e4ec6` · `#30a46c` · `#d6409f` · `#12a594` · `#8d8d8d` | same | Radix step 9 · the Area colours, never blue or amber: the Area's swatch, its hub in the Graph, and an 18% tint mixed into `surface` behind its Projects' avatars |
 | `alpha-100` … `alpha-600` | `#0000000d` … `#00000057` | `#ffffff0f` … `#ffffff82` | gray-alpha 100, 200, 400, 500, 600 · 100 hover, 200 selected, 400 a field's or a key's edge and the gauge track, 500 a hovered field's edge – the same on any surface |
 | `error-text` | `#cb2a2f` | `#ff6166` | red-900 · error text (`text-error`) – 5.4 / 6.7:1 |
 | `error-fill` | `#da2f35` | `#d93036` | red-800 · the hovered Close; white on it 4.7:1 |
@@ -253,7 +245,7 @@ System, Light or Dark, switched from the NavUser's menu; System follows `prefers
 - Casing: headings, card and Panel titles, field labels, filter labels, buttons, menu items and
   Find's headings and actions are Title Case (*Where You Left Off*, *Needs You*, *In Motion*, *Last
   Activity*); running text and descriptions stay sentence case. Small uppercase only for the
-  headings of a rail's sections (*GROUPS*, *AREAS*), which name a list rather than read as text.
+  headings of a rail's sections (*GROUPS*, *SESSIONS*), which name a list rather than read as text.
 - Structure: every page has one visible `h1` – the header names no page – and its cards and
   Panels are `h2`. Labelled
   values are Geist's Description: a `<dl>` of `<dt>` / `<dd>` pairs.
@@ -268,7 +260,7 @@ the information.
 ## Shape and motion
 
 - The Graph is the one place that moves on its own: the network settles into place, a ring turns
-  around a busy Session as a spinner does, and sparks run from it to its Project and on to the Area. Under
+  around a busy Session as a spinner does, and sparks run from it to its Project and on to the hub. Under
   `prefers-reduced-motion` the layout settles at once and nothing moves.
 - Edges are a 1 px spread shadow (`edge` utility, `0 0 0 1px var(--ud-line)`), not `border`; the
   header uses a one-sided shadow. A drop target being hovered gets a 2 px `accent` ring.

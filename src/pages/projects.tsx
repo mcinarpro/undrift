@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { openExternal } from "@/bridge";
 import { Action } from "@/components/action";
-import { AreaSwatch, Empty, FocusBadge, GROUP_DOT, GroupBadge, GroupDot, ProjectAvatar, Segmented, StatusMark, useNow, When } from "@/components/bits";
+import { Empty, FocusBadge, GROUP_DOT, GroupBadge, GroupDot, ProjectAvatar, Segmented, StatusMark, useNow, When } from "@/components/bits";
 import { DriftStrip } from "@/components/drift-strip";
 import { Icon } from "@/components/icon";
 import { Bar, useProjectsRead } from "@/components/loading";
@@ -20,18 +20,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { driftCells } from "@/lib/home";
 import {
-  areaFilters,
   changes,
-  filterKey,
   group,
   groupFilters,
   groupKey,
   inGroup,
-  matches,
   openStatuses,
   sorted,
   SORTS,
-  type AreaFilter,
   type GroupFilter,
   type Sort,
 } from "@/lib/projects";
@@ -42,7 +38,6 @@ import type { Project } from "@/types";
 // Projects (DESIGN.md § Layout): every Project as Vercel's project card or as a row, narrowed by a
 // rail of filters with their counts. A card or a row opens the Project's page.
 
-const ALL_AREAS: AreaFilter = { kind: "all" };
 const ALL_GROUPS: GroupFilter = { kind: "all" };
 
 const RING = "focus-visible:shadow-[0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--ud-focus)]";
@@ -51,25 +46,23 @@ const RING = "focus-visible:shadow-[0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--
 const MENU_ROW = "h-9 gap-2 rounded-md px-2 text-sm";
 const MENU = "rounded-xl p-1 ring-0 shadow-(--ud-shadow-menu)";
 
-/** The page's own rail: All with the groups, the Loose Ends and the Focus, then the Areas. One
- * choice per section, and the two combine; each count says what choosing it would show. A row is
- * a toggle: choosing the current one again gives its section back to All. */
-function Rail({ projects, area, grp, now }: { projects: Project[]; area: AreaFilter; grp: GroupFilter; now: Date }) {
+/** The page's own rail: All with the groups, the Loose Ends and the Focus. One choice; each count
+ * says what choosing it would show. A row is a toggle: choosing the current one again gives the
+ * rail back to All. */
+function Rail({ projects, grp, now }: { projects: Project[]; grp: GroupFilter; now: Date }) {
   const setFilters = useStore((s) => s.setFilters);
-  const groups = groupFilters(projects, now, (p) => matches(p, area));
-  // The rail's All stands for both sections, so the Areas' own All is left out.
-  const areas = areaFilters(projects, (p) => inGroup(p, grp, now)).slice(1);
+  const groups = groupFilters(projects, now, () => true);
   const pick = <T,>(current: T, chosen: T, key: (f: T) => string, all: T) => (key(current) === key(chosen) ? all : chosen);
   return (
     <nav aria-label="Filters" className="sticky top-0 flex max-h-[calc(100dvh-3rem)] w-60 shrink-0 flex-col gap-6 self-start overflow-y-auto py-8 pl-6">
       {/* All heads the first section rather than standing alone above it. */}
       <RailSection title="Groups">
         <RailItem
-          current={area.kind === "all" && grp.kind === "all"}
+          current={grp.kind === "all"}
           marker={NO_MARKER}
           label="All"
           count={projects.length}
-          onClick={() => setFilters({ area: ALL_AREAS, group: ALL_GROUPS })}
+          onClick={() => setFilters({ group: ALL_GROUPS })}
         />
         {groups.map((o) => (
           <RailItem
@@ -82,20 +75,6 @@ function Rail({ projects, area, grp, now }: { projects: Project[]; area: AreaFil
           />
         ))}
       </RailSection>
-      {areas.length > 0 && (
-        <RailSection title="Areas">
-          {areas.map((o) => (
-            <RailItem
-              key={filterKey(o.filter)}
-              current={filterKey(o.filter) === filterKey(area)}
-              marker={<AreaSwatch color={o.color} className="size-2.5" />}
-              label={o.label}
-              count={o.count}
-              onClick={() => setFilters({ area: pick(area, o.filter, filterKey, ALL_AREAS) })}
-            />
-          ))}
-        </RailSection>
-      )}
     </nav>
   );
 }
@@ -179,7 +158,7 @@ function ProjectCard({ project, now }: { project: Project; now: Date }) {
     // ring over the edge and keeps the drop.
     <article className="relative flex min-w-0 flex-col gap-3 rounded-md p-4 material-small transition-shadow duration-150 hover:shadow-[0_0_0_1px_var(--ud-line-strong),var(--ud-shadow-small)] has-[[data-open]:focus-visible]:shadow-[0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--ud-focus)]">
       <header className="flex w-full min-w-0 items-center gap-3">
-        <ProjectAvatar name={project.name} color={project.area?.color} />
+        <ProjectAvatar name={project.name} />
         <div className="flex min-w-0 grow flex-col">
           <h2 className="flex min-w-0 type-heading-14">
             <button
@@ -249,13 +228,9 @@ function ProjectRow({ project, now }: { project: Project; now: Date }) {
         className="col-span-full grid grid-cols-subgrid items-center px-4 py-3 text-left transition-colors duration-150 hover:bg-alpha-100"
       >
         <span className="flex min-w-0 items-center gap-3">
-          <ProjectAvatar name={project.name} color={project.area?.color} size={24} />
+          <ProjectAvatar name={project.name} size={24} />
           <span className="max-w-3/5 shrink-0 truncate type-label-14 font-medium">{project.name}</span>
           <span className="truncate type-label-13-mono text-muted-foreground">{project.shortPath}</span>
-        </span>
-        <span className="flex min-w-0 items-center gap-1.5 type-label-13 text-text-2">
-          <AreaSwatch color={project.area?.color} className="size-2.5" />
-          <span className="truncate">{project.area?.name ?? "Unsorted"}</span>
         </span>
         <GroupBadge group={group(project, now)} />
         <span className="flex min-w-0 items-center gap-1.5 type-label-13-mono text-muted-foreground">
@@ -286,9 +261,9 @@ const GROUP_WORDS: Record<GroupFilter["kind"], string> = {
   focus: "is in Focus",
 };
 
-/** What an empty choice means, in a sentence: *No Project in Mobile is drifting.* */
-function nothing(area: AreaFilter, grp: GroupFilter): string {
-  const who = area.kind === "area" ? `No Project in ${area.name}` : area.kind === "unsorted" ? "No Unsorted Project" : "No Project";
+/** What an empty choice means, in a sentence: *No Project is drifting.* */
+function nothing(grp: GroupFilter): string {
+  const who = "No Project";
   const what = grp.kind === "group" ? `is ${grp.group.toLowerCase()}` : GROUP_WORDS[grp.kind];
   return `${who}${what ? ` ${what}` : ""}.`;
 }
@@ -338,17 +313,14 @@ function CardSkeleton() {
 }
 
 export function Projects() {
-  const { areaFilter, groupFilter, sort, view, setFilters, setSort, setView } = useStore();
+  const { groupFilter, sort, view, setFilters, setSort, setView } = useStore();
   const now = useNow();
   const { phase, projects } = useProjectsRead();
   const all = projects ?? [];
-  // An Area left without Projects leaves the rail, so its choice falls back to All: the page never
-  // shows nothing with no row to tell why. A group's row stays at 0, so its choice stays too, and
-  // the Empty State says what it holds.
+  // A group's row stays at 0, so its choice stays too, and the Empty State says what it holds.
   const grp = groupFilter;
-  const area = areaFilters(all).some((o) => filterKey(o.filter) === filterKey(areaFilter)) ? areaFilter : ALL_AREAS;
   const shown = sorted(
-    all.filter((p) => matches(p, area) && inGroup(p, grp, now)),
+    all.filter((p) => inGroup(p, grp, now)),
     sort,
     now,
   );
@@ -356,7 +328,7 @@ export function Projects() {
 
   return (
     <div className="flex w-full">
-      {projects ? <Rail projects={all} area={area} grp={grp} now={now} /> : phase === "skeleton" ? <RailSkeleton /> : <div className="w-60 shrink-0" />}
+      {projects ? <Rail projects={all} grp={grp} now={now} /> : phase === "skeleton" ? <RailSkeleton /> : <div className="w-60 shrink-0" />}
       {/* The grid answers to the width left beside the rail, not the window's. */}
       <div className="@container flex min-w-0 grow flex-col gap-6 px-8 py-8">
         <header className="flex flex-wrap items-end justify-between gap-4">
@@ -402,12 +374,12 @@ export function Projects() {
               <Empty
                 icon={<Icon name="projects" size={20} />}
                 action={
-                  <Action variant="secondary" size="small" onClick={() => setFilters({ area: ALL_AREAS, group: ALL_GROUPS })}>
+                  <Action variant="secondary" size="small" onClick={() => setFilters({ group: ALL_GROUPS })}>
                     Show All
                   </Action>
                 }
               >
-                {nothing(area, grp)}
+                {nothing(grp)}
               </Empty>
             </div>
           ) : view === "grid" ? (
@@ -417,7 +389,7 @@ export function Projects() {
               ))}
             </div>
           ) : (
-            <ul className="grid grid-cols-[minmax(0,3fr)_minmax(0,1fr)_auto_minmax(0,1fr)_auto_auto] gap-x-6 rounded-md material-small">
+            <ul className="grid grid-cols-[minmax(0,3fr)_auto_minmax(0,1fr)_auto_auto] gap-x-6 rounded-md material-small">
               {shown.map((p) => (
                 <ProjectRow key={p.path} project={p} now={now} />
               ))}

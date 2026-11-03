@@ -1,21 +1,21 @@
 import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type ForceLink, type Simulation, type SimulationLinkDatum, type SimulationNodeDatum } from "d3-force";
-import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Action } from "@/components/action";
-import { Activity, AreaName, AreaSwatch, Diff, Empty, Field, GroupBadge, GroupDot, Hint, ProjectAvatar, STATUS_DOT, StatusMark, useNow, When } from "@/components/bits";
+import { Activity, Diff, Empty, Field, GroupBadge, GroupDot, Hint, ProjectAvatar, STATUS_DOT, StatusMark, useNow, When } from "@/components/bits";
 import { Icon } from "@/components/icon";
 import { useProjectsRead } from "@/components/loading";
 import { lightHandlers, RailItem, RailSection, RailSkeleton, type LightBy } from "@/components/rail";
 import { age, looseEnds, status, type LooseEnd, type StatusName } from "@/lib/home";
-import { areaFilters, drift, group, lastSession, ordered, type Group } from "@/lib/projects";
+import { drift, group, lastSession, ordered, type Group } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store";
 import type { Project, Session } from "@/types";
 
-// The Graph (GLOSSARY.md, DESIGN.md § Layout): the Projects as a network – a hub per Area in its
-// colour, a node per Project ringed in its group's colour, a dot per Session by Status – laid out
+// The Graph (GLOSSARY.md, DESIGN.md § Layout): the Projects as a network – one hub, a node per
+// Project ringed in its group's colour, a dot per Session by Status – laid out
 // by a d3-force simulation and drawn in SVG. It is the one page that moves on its own (DESIGN.md
 // § Shape and motion): the network settles, a busy Session's dot pulses, and sparks run from it to
-// its Project and on to the Area. A click on a node opens its panel on the right, so the network
+// its Project and on to the hub. A click on a node opens its panel on the right, so the network
 // stays in view while one of its parts is read. A rail on the left says what there is to look at,
 // and a row under the pointer or the focus lights its part of the network and fades the rest.
 
@@ -28,11 +28,9 @@ type Kind = "hub" | "project" | "session";
 type GraphNode = SimulationNodeDatum & {
   id: string;
   kind: Kind;
-  /** The node it is tied to: a Project's hub, a Session's Project; null for a hub. */
+  /** The node it is tied to: a Project's hub, a Session's Project; null for the hub. */
   parent: string | null;
   label: string;
-  /** A hub's Area colour; none for Unsorted. */
-  color?: string;
   /** A Project node's Project, and a Session dot's. */
   project?: Project;
   group?: Group;
@@ -44,7 +42,7 @@ type GraphNode = SimulationNodeDatum & {
 type Link = SimulationLinkDatum<GraphNode> & { source: string | GraphNode; target: string | GraphNode };
 
 // A node's id says what it stands for, so the rail and the panels find the node a row means.
-const hubId = (area: string | null) => (area ? `area:${area}` : "unsorted");
+const HUB = "hub";
 const projectId = (p: Project) => `project:${p.path}`;
 
 // Every node the Graph has placed, by id, kept outside the page: a refresh from the bridge and a
@@ -99,14 +97,9 @@ function build(projects: Project[], now: Date): { nodes: GraphNode[]; links: Lin
     return { x: (p?.x ?? 0) + (Math.random() - 0.5) * spread, y: (p?.y ?? 0) + (Math.random() - 0.5) * spread };
   };
 
-  const hubOf = (p: Project) => hubId(p.area?.name ?? null);
-  const hubs = new Map<string, { label: string; color?: string; rank: number }>();
-  for (const p of projects) hubs.set(hubOf(p), p.area ? { label: p.area.name, color: p.area.color, rank: p.area.rank } : { label: "Unsorted", rank: Infinity });
-  const ring = [...hubs.entries()].sort((a, b) => a[1].rank - b[1].rank);
-  ring.forEach(([id, h], i) => {
-    const angle = (2 * Math.PI * i) / ring.length;
-    add({ id, kind: "hub", parent: null, label: h.label, color: h.color }, () => ({ x: Math.cos(angle) * 160, y: Math.sin(angle) * 160 }));
-  });
+  // One hub at the centre, which every Project is tied to: it gives the network its shape.
+  const hubOf = (_p: Project) => HUB;
+  add({ id: HUB, kind: "hub", parent: null, label: "Projects" }, () => ({ x: 0, y: 0 }));
 
   for (const p of projects) {
     const id = projectId(p);
@@ -130,7 +123,7 @@ function build(projects: Project[], now: Date): { nodes: GraphNode[]; links: Lin
 }
 
 /** The part of the network a rail row lights: a node with the nodes tied right under it – an
- * Area's hub with its Projects, or a Project with its Sessions – or the Sessions in one Status
+ * the hub with its Projects, or a Project with its Sessions – or the Sessions in one Status
  * with their Projects. */
 type Light = { root: string } | { dot: Dot };
 
@@ -256,7 +249,7 @@ function SelectRing({ r, selected }: { r: number; selected: boolean }) {
 function ProjectNode({ n, ...select }: { n: GraphNode } & Selectable) {
   const p = n.project!;
   return (
-    <SelectableNode n={n} label={`${p.name}, ${n.group?.toLowerCase()}, ${p.area?.name ?? "Unsorted"}`} {...select}>
+    <SelectableNode n={n} label={`${p.name}, ${n.group?.toLowerCase()}`} {...select}>
       <SelectRing r={RADIUS.project + 5} selected={select.selected} />
       <circle r={RADIUS.project} strokeWidth={3.5} className={cn("fill-card", RING[n.group ?? "Parked"])} />
       <text y={RADIUS.project + 16} textAnchor="middle" className={cn("fill-text-2 type-label-12 transition-colors duration-150 group-hover:fill-foreground", HALO)}>
@@ -349,11 +342,10 @@ function SessionDot({ n, ...select }: { n: GraphNode } & Selectable) {
 }
 
 function HubNode({ n, ...select }: { n: GraphNode } & Selectable) {
-  const tint = n.color ? ({ "--area": `var(--ud-area-${n.color})` } as CSSProperties) : undefined;
   return (
-    <SelectableNode n={n} label={`Area ${n.label}`} {...select}>
+    <SelectableNode n={n} label={n.label} {...select}>
       <SelectRing r={RADIUS.hub + 5} selected={select.selected} />
-      <circle r={RADIUS.hub} style={tint} className={n.color ? "fill-(--area)" : "fill-parked"} />
+      <circle r={RADIUS.hub} className="fill-parked" />
       <text y={-RADIUS.hub - 8} textAnchor="middle" className={cn("fill-foreground type-label-13 font-medium", HALO)}>
         {n.label}
       </text>
@@ -372,7 +364,7 @@ function ProjectPanel({ project, now }: { project: Project; now: Date }) {
   return (
     <>
       <header className="flex min-w-0 items-center gap-3 pr-8">
-        <ProjectAvatar name={project.name} color={project.area?.color} />
+        <ProjectAvatar name={project.name} />
         <div className="flex min-w-0 flex-col">
           <h2 className="truncate type-heading-16">{project.name}</h2>
           <span className="truncate type-label-13-mono text-muted-foreground">{project.shortPath}</span>
@@ -385,9 +377,6 @@ function ProjectPanel({ project, now }: { project: Project; now: Date }) {
           <span className="type-label-13-mono text-text-2 tabular-nums">{drift(project, now)}</span>
         </Field>
         <Field label="Last Activity">{project.lastActivity ? <When iso={project.lastActivity} now={now} /> : <span className="text-muted-foreground">None</span>}</Field>
-        <Field label="Area">
-          <AreaName project={project} />
-        </Field>
         <Field label="Changes">
           {!repo ? <span className="text-muted-foreground">Not a git repository</span> : left ? <Diff project={project} /> : <span className="text-muted-foreground">Nothing left behind</span>}
         </Field>
@@ -444,7 +433,7 @@ function SessionPanel({ node, now, onSelect }: { node: GraphNode; now: Date; onS
             onClick={() => onSelect(projectId(project))}
             className="-mx-1 flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 transition-colors duration-150 hover:bg-alpha-100 focus-visible:shadow-[0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--ud-focus)]"
           >
-            <ProjectAvatar name={project.name} color={project.area?.color} size={20} />
+            <ProjectAvatar name={project.name} size={20} />
             <span className="truncate">{project.name}</span>
           </button>
         </Field>
@@ -466,12 +455,11 @@ function SessionPanel({ node, now, onSelect }: { node: GraphNode; now: Date; onS
   );
 }
 
-/** An Area as a panel shows it: its Projects, the Drifting first, each opening its own panel. */
-function AreaPanel({ node, projects, now, onSelect }: { node: GraphNode; projects: Project[]; now: Date; onSelect: (id: string) => void }) {
+/** The hub as a panel shows it: every Project, the Drifting first, each opening its own panel. */
+function HubPanel({ node, projects, now, onSelect }: { node: GraphNode; projects: Project[]; now: Date; onSelect: (id: string) => void }) {
   return (
     <>
       <header className="flex min-w-0 items-center gap-2 pr-8">
-        <AreaSwatch color={node.color} />
         <h2 className="truncate type-heading-16">{node.label}</h2>
         <span className="type-label-13 text-muted-foreground tabular-nums">{projects.length}</span>
       </header>
@@ -483,7 +471,7 @@ function AreaPanel({ node, projects, now, onSelect }: { node: GraphNode; project
               onClick={() => onSelect(projectId(p))}
               className="flex w-full min-w-0 items-center gap-3 rounded-md px-2 py-2 text-left transition-colors duration-150 hover:bg-alpha-100 focus-visible:shadow-[0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--ud-focus)]"
             >
-              <ProjectAvatar name={p.name} color={p.area?.color} size={24} />
+              <ProjectAvatar name={p.name} size={24} />
               <span className="grow truncate type-label-14">{p.name}</span>
               {p.lastActivity && <When iso={p.lastActivity} now={now} />}
               <GroupDot name={p.name} group={group(p, now)} />
@@ -512,7 +500,7 @@ function NodePanel({ node, nodes, now, onSelect, onClose }: { node: GraphNode; n
       ) : node.kind === "session" ? (
         <SessionPanel node={node} now={now} onSelect={onSelect} />
       ) : (
-        <AreaPanel node={node} projects={nodes.filter((n) => n.kind === "project" && n.parent === node.id).map((n) => n.project!)} now={now} onSelect={onSelect} />
+        <HubPanel node={node} projects={nodes.filter((n) => n.kind === "project" && n.parent === node.id).map((n) => n.project!)} now={now} onSelect={onSelect} />
       )}
     </aside>
   );
@@ -541,7 +529,7 @@ function Legend() {
         <LegendItem mark={ring("parked")}>Parked</LegendItem>
       </ul>
       <ul className="flex flex-col gap-1.5" aria-label="Links">
-        <LegendItem mark={<span aria-hidden="true" className="h-px w-2.5 shrink-0 bg-border" />}>Tied to Area or Project</LegendItem>
+        <LegendItem mark={<span aria-hidden="true" className="h-px w-2.5 shrink-0 bg-border" />}>Tied to its Project, or to the hub</LegendItem>
       </ul>
     </div>
   );
@@ -560,7 +548,6 @@ function LooseEndRow({ le, now, current, onSelect, onLight }: { le: LooseEnd; no
     >
       <button type="button" aria-pressed={current} onClick={onSelect} className="flex min-w-0 grow flex-col gap-0.5 rounded-md py-1.5 pl-2.5 text-left">
         <span className="flex min-w-0 items-center gap-1.5 type-label-12 text-muted-foreground">
-          <AreaSwatch color={project.area?.color} className="size-2" />
           <span className="truncate">{project.name}</span>
           <span className="shrink-0 tabular-nums">· {age(session.lastActivity, now)}</span>
         </span>
@@ -576,10 +563,9 @@ function LooseEndRow({ le, now, current, onSelect, onLight }: { le: LooseEnd; no
   );
 }
 
-/** The Graph's own rail: the Loose Ends, the Areas, then the Sessions by Status, each row lighting
- * its part of the network under the pointer or the focus. A Loose End or an Area opens its node's
- * panel, as a click on the node does; a Status, which has no panel, keeps its part lit until it is
- * chosen again. */
+/** The Graph's own rail: the Loose Ends, then the Sessions by Status, each row lighting its part
+ * of the network under the pointer or the focus. A Loose End opens its node's panel, as a click on
+ * the node does; a Status, which has no panel, keeps its part lit until it is chosen again. */
 function GraphRail({
   projects,
   nodes,
@@ -600,8 +586,6 @@ function GraphRail({
   onLight: (light: Light | null, by: LightBy) => void;
 }) {
   const ends = looseEnds(projects, now).flatMap((g) => g.items);
-  // The rail's All would light the whole network, which is the network unlit.
-  const areas = areaFilters(projects).filter((o) => o.filter.kind !== "all");
   const toggle = (id: string) => onSelect(selected === id ? null : id);
   const lightOn = (light: Light) => (on: boolean, by: LightBy) => onLight(on ? light : null, by);
   return (
@@ -614,28 +598,12 @@ function GraphRail({
           })}
         </RailSection>
       )}
-      <RailSection title="Areas">
-        {areas.map((o) => {
-          const id = hubId(o.filter.kind === "area" ? o.filter.name : null);
-          return (
-            <RailItem
-              key={id}
-              current={selected === id}
-              marker={<AreaSwatch color={o.color} className="size-2.5" />}
-              label={o.label}
-              count={o.count}
-              onClick={() => toggle(id)}
-              onLight={lightOn({ root: id })}
-            />
-          );
-        })}
-      </RailSection>
       <RailSection title="Sessions">
         {DOTS.map((dot) => (
           <RailItem
             key={dot}
             current={chosen === dot}
-            // The 10 px column the Areas' swatches take, so the labels line up across sections.
+            // A 10 px column for the dot, so the labels line up with the Loose Ends'.
             marker={
               <span aria-hidden="true" className="flex size-2.5 shrink-0 items-center justify-center">
                 <span className={cn("size-2 rounded-full", DOT_MARK[dot])} />
@@ -833,7 +801,7 @@ export function Graph() {
               height={size.h}
               viewBox={fit(graph.nodes, size.w, size.h, open ? PANEL_WIDTH + 32 : 0)}
               role="group"
-              aria-label="The Projects as a network, tied to their Area"
+              aria-label="The Projects as a network"
               className="absolute inset-0 cursor-grab touch-none select-none active:cursor-grabbing"
               onPointerDown={(e) => {
                 if (e.button !== 0 || (e.target as Element).closest("[role=button]")) return;
@@ -867,7 +835,7 @@ export function Graph() {
                   return <line key={`${a.id}>${b.id}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} strokeWidth={1} className={cn("stroke-border", fade(dim(a.id) || dim(b.id)))} />;
                 })}
               </g>
-              {/* Sparks run from a busy Session to its Project and on to the Area, never under
+              {/* Sparks run from a busy Session to its Project and on to the hub, never under
                   reduced motion. */}
               {!still && (
                 <g aria-hidden="true">

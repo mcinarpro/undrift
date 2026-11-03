@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import * as bridge from "@/bridge";
 import { failed, toasts } from "@/components/toast";
-import { SORTS, type AreaFilter, type GroupFilter, type Sort } from "@/lib/projects";
+import { SORTS, type GroupFilter, type Sort } from "@/lib/projects";
 import { savedTheme, setTheme, type ThemeChoice } from "@/lib/theme";
 import type { NavUser, Project, Read } from "@/types";
 
@@ -35,8 +35,7 @@ type State = {
   /** The path of the Project whose page is open; a Project page belongs to Projects, so it is
    * only shown while `page` is `projects`. */
   project: string | null;
-  /** Kept here rather than in the page, so coming back from a Project page keeps the filters. */
-  areaFilter: AreaFilter;
+  /** Kept here rather than in the page, so coming back from a Project page keeps the filter. */
   groupFilter: GroupFilter;
   sort: Sort;
   view: View;
@@ -55,9 +54,8 @@ type State = {
   read: Read;
   go: (page: Page) => void;
   openProject: (path: string) => void;
-  setAreaFilter: (filter: AreaFilter) => void;
-  /** The rail's choices, in either section or both; the page stays where it is. */
-  setFilters: (filters: { area?: AreaFilter; group?: GroupFilter }) => void;
+  /** The rail's choice; the page stays where it is. */
+  setFilters: (filters: { group?: GroupFilter }) => void;
   setSort: (sort: Sort) => void;
   setView: (view: View) => void;
   setFindOpen: (open: boolean) => void;
@@ -67,14 +65,12 @@ type State = {
   newSession: (path: string) => void;
   start: (path: string, issue: number) => void;
   letGo: (path: string, name: string) => void;
-  setArea: (path: string, area: { name: string; color: string } | null) => void;
   setFocus: (path: string, on: boolean) => void;
 };
 
 export const useStore = create<State>((set) => ({
   page: "home",
   project: null,
-  areaFilter: { kind: "all" },
   groupFilter: { kind: "all" },
   sort: saved("projects.sort", SORTS.map((s) => s.value), "drift"),
   view: saved<View>("projects.view", ["grid", "list"], "grid"),
@@ -87,10 +83,7 @@ export const useStore = create<State>((set) => ({
   read: { sessions: false, git: false, github: false },
   go: (page) => set({ page, project: null, findOpen: false }),
   openProject: (path) => set({ page: "projects", project: path, findOpen: false }),
-  // The breadcrumb's Area leads back to the Projects page filtered by it. The group filter goes
-  // back to All, so the Area shows whole and the Project just left is among its cards.
-  setAreaFilter: (areaFilter) => set({ page: "projects", project: null, areaFilter, groupFilter: { kind: "all" } }),
-  setFilters: ({ area, group }) => set((s) => ({ areaFilter: area ?? s.areaFilter, groupFilter: group ?? s.groupFilter })),
+  setFilters: ({ group }) => set((s) => ({ groupFilter: group ?? s.groupFilter })),
   setSort: (sort) => {
     save("projects.sort", sort);
     set({ sort });
@@ -125,7 +118,6 @@ export const useStore = create<State>((set) => ({
       )
       .catch((e) => failed("let go of the Loose End", e)),
   // The Badge and the rails follow with the list the bridge sends back on its next tick.
-  setArea: (path, area) => void bridge.setArea(path, area).catch((e) => failed("file the Project", e)),
   // A fourth Project is refused by the bridge, whose words – three at most – reach the toast.
   setFocus: (path, on) => void bridge.setFocus(path, on).catch((e) => failed(on ? "put the Project in Focus" : "take the Project out of Focus", e)),
 }));

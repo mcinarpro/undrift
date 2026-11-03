@@ -53,45 +53,8 @@ export function ordered(projects: Project[], now: Date): Project[] {
     .map(({ p }) => p);
 }
 
-/** What the Projects page lists: every Project, the Unsorted ones, or one Area's by its name. */
-export type AreaFilter = { kind: "all" } | { kind: "unsorted" } | { kind: "area"; name: string };
-
-/** The Area palette (DESIGN.md § Colour, `--ud-area-*`), in the order New Area offers it. */
-export const AREA_COLORS = ["purple", "green", "pink", "teal", "gray"] as const;
-export type AreaColor = (typeof AREA_COLORS)[number];
-
-/** A filter as the value of its radio. */
-export const filterKey = (f: AreaFilter) => (f.kind === "area" ? `area:${f.name}` : f.kind);
-
-export function matches(p: Project, f: AreaFilter): boolean {
-  if (f.kind === "all") return true;
-  if (f.kind === "unsorted") return !p.area;
-  return p.area?.name === f.name;
-}
-
-export type FilterOption = { filter: AreaFilter; label: string; color?: string; count: number };
-
-/** All, then every Area that holds a Project in its rank, then Unsorted when a Project has no Area:
- * an Area exists only while it holds a Project (GLOSSARY.md § Area), so none is ever empty. The
- * choices come from every Project, so the rail keeps its rows while the group filter changes; each
- * count covers only the Projects `within` keeps, so it says what choosing it would show. */
-export function areaFilters(projects: Project[], within: (p: Project) => boolean = () => true): FilterOption[] {
-  const areas = new Map<string, { rank: number; color: string }>();
-  for (const p of projects) if (p.area && !areas.has(p.area.name)) areas.set(p.area.name, { rank: p.area.rank, color: p.area.color });
-  const kept = projects.filter(within);
-  const count = (f: AreaFilter) => kept.filter((p) => matches(p, f)).length;
-  const unsorted: AreaFilter = { kind: "unsorted" };
-  return [
-    { filter: { kind: "all" }, label: "All", count: kept.length },
-    ...[...areas.entries()]
-      .sort((a, b) => a[1].rank - b[1].rank)
-      .map(([name, a]): FilterOption => ({ filter: { kind: "area", name }, label: name, color: a.color, count: count({ kind: "area", name }) })),
-    ...(projects.some((p) => !p.area) ? [{ filter: unsorted, label: "Unsorted", count: count(unsorted) }] : []),
-  ];
-}
-
 /** The rail's first section: every Project, one group, the Loose Ends or the Focus – what a
- * Project is doing, beside the Area it is filed under. */
+ * Project is doing. */
 export type GroupFilter = { kind: "all" } | { kind: "group"; group: Group } | { kind: "looseEnds" } | { kind: "focus" };
 
 /** A filter as a key to compare and store it by. */

@@ -87,16 +87,6 @@ pub struct OpenSessionView {
     pub status_since: Option<String>,
 }
 
-/// The Area a Project is filed under, as the window shows it (src/types.ts `AreaRef`).
-#[derive(Serialize, Clone, PartialEq, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct AreaView {
-    pub name: String,
-    pub color: String,
-    /// Its place among the Areas, from 0.
-    pub rank: u32,
-}
-
 /// A Project as the window shows it (src/types.ts `Project`).
 #[derive(Serialize, Clone, PartialEq, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -106,8 +96,6 @@ pub struct Project {
     pub name: String,
     /// When it was put in Focus (RFC 3339); `None` when it is not in Focus.
     pub focus_since: Option<String>,
-    /// The Area it is filed under; `None` when it is Unsorted.
-    pub area: Option<AreaView>,
     pub repo: Option<Repo>,
     /// Local days (YYYY-MM-DD) with Activity in the last 30, oldest first.
     pub active_days: Vec<String>,
@@ -280,12 +268,6 @@ impl Known {
 
     fn build(&self, config: &Config) -> Vec<Project> {
         let focus: BTreeMap<PathBuf, &str> = config.focus.iter().map(|f| (config::expand(&f.path), f.since.as_str())).collect();
-        let areas: BTreeMap<PathBuf, AreaView> = config
-            .areas
-            .iter()
-            .enumerate()
-            .flat_map(|(i, a)| a.projects.iter().map(move |p| (config::expand(p), AreaView { name: a.name.clone(), color: a.color.clone(), rank: i as u32 })))
-            .collect();
         let first_day = (Local::now().date_naive() - chrono::Duration::days(WINDOW_DAYS - 1)).to_string();
         let mut by_path: BTreeMap<PathBuf, (BTreeSet<String>, Vec<&Record>, Vec<&Session>)> =
             self.paths(config).into_iter().map(|p| (p, Default::default())).collect();
@@ -318,7 +300,6 @@ impl Known {
                     short_path: config::short(&path),
                     name: path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.display().to_string()),
                     focus_since: focus.get(&path).map(|s| s.to_string()),
-                    area: areas.get(&path).cloned(),
                     repo: read.map(|r| Repo {
                         description: r.repo.github.as_ref().and_then(|g| self.descriptions.get(g)).cloned().flatten(),
                         ..r.repo.clone()

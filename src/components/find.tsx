@@ -97,7 +97,7 @@ export function Find() {
               {projects.map((p) => (
                 // The path keeps the value unique; the name is what is typed.
                 <CommandItem key={p.path} value={`project ${p.path}`} keywords={[p.name]} onSelect={() => openProject(p.path)} className={ROW}>
-                  <ProjectAvatar name={p.name} color={p.area?.color} size={20} />
+                  <ProjectAvatar name={p.name} size={20} />
                   <span className="truncate">{p.name}</span>
                   <span className="ml-auto truncate font-mono text-xs text-muted-foreground">{p.shortPath}</span>
                 </CommandItem>

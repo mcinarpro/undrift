@@ -16,13 +16,12 @@ MIT.
 - **Home** – the Loose Ends, newest first; beside them **Needs You**, the open Sessions waiting on
   you, busy, or gone quiet, and the Issues ready to Start.
 - **Projects** – every Project as a card or a row, with a rail of filters: the groups – In motion,
-  Drifting, Parked – the Loose Ends, the Focus, and the Areas.
-- **Graph** – the Projects as a network: a hub per Area, a node per Project, a dot per Session.
+  Drifting, Parked – the Loose Ends and the Focus.
+- **Graph** – the Projects as a network: one hub, a node per Project, a dot per Session.
 - **A page per Project** – its git state, its open and earlier Sessions, its Issues, and the
-  actions: Resume, New Session, Start, Let Go. Focus, Hides and Areas are set in `config.json`
-  for now.
+  actions: Resume, New Session, Start, Focus, Let Go. Hides are set in `config.json` for now.
 
-The words – Project, Session, Loose End, Drift, Area, Focus, Let Go – are defined in
+The words – Project, Session, Loose End, Drift, Focus, Let Go – are defined in
 [GLOSSARY.md](GLOSSARY.md). The visual system is [DESIGN.md](DESIGN.md). The decisions that would
 look wrong without their reason are in [docs/adr/](docs/adr/).
 
@@ -36,8 +35,8 @@ look wrong without their reason are in [docs/adr/](docs/adr/).
 | `gh issue list`, `gh repo view`, `gh api user` | the open Issues, the repository's description, the account and its avatar |
 
 Projects are discovered: every git root directly under `~/workspace`, plus every folder a Session
-ran in. Undrift's own state lives in `~/.config/undrift/config.json` (roots, Hides, Focus, Areas,
-and `terminal`, the terminal to open on Linux – empty takes `$TERMINAL`, then the first one on the
+ran in. Undrift's own state lives in `~/.config/undrift/config.json` (roots, Hides, Focus, and
+`terminal`, the terminal to open on Linux – empty takes `$TERMINAL`, then the first one on the
 PATH) and `~/.local/share/undrift/` (the transcript cache, the Let Gos, the avatar).
 
 ## What it starts

@@ -29,12 +29,6 @@ Taking one Loose End off Home until the Project's next Activity, for work Mehmet
 finish. The Project stays everywhere else.
 _Avoid_: Dismiss, snooze, ignore, archive
 
-**Area**:
-A theme Mehmet files Projects under – a site and its spin-offs, the mobile apps, a field of study.
-A Project sits in one Area at most, chosen on its page. An Area has a colour, and exists while it
-holds a Project.
-_Avoid_: Folder, group, category, workspace
-
 **Home**:
 The first page Undrift opens on: the Loose Ends, newest first, and beside them, on a wide window,
 Needs You over the Issues ready to Start – on a narrower one the Issues come under the Loose Ends.
@@ -54,18 +48,14 @@ repository is never one, nor is a repository with no commit yet.
 _Avoid_: Unfinished, pending, WIP, dirty repo
 
 **Graph**:
-The Projects drawn as a network: a hub per Area, a node per Project tied to it, a dot per Session
-tied to its Project.
+The Projects drawn as a network: one hub, a node per Project tied to it, a dot per Session tied
+to its Project.
 _Avoid_: Map, scene, Office
 
 **Lanes**:
-The Projects drawn in time: a row per Project grouped by Area, its days with Activity across 30
-days, and the Sessions open Now.
+The Projects drawn in time: a row per Project, its days with Activity across 30 days, and the
+Sessions open Now.
 _Avoid_: Timeline, list
-
-**Unsorted**:
-The Projects in no Area, tied to the Unsorted hub in the Graph.
-_Avoid_: Other, misc, uncategorized
 
 **Session**:
 One Claude Code conversation in a Project, identified by its session id. It is either open
