@@ -31,7 +31,7 @@ window. A view is described here once it is built; until then this section holds
   its Project and Area, the last Session's title and last prompt, files changed with +/− (left out
   when no tracked line changed), the branch unless it is `main` or `master`, how long ago it was left
   and the Status of its Session when one is open. Each section is a grid of `material-small` cards,
-  12 px, two across and three from a 1536 px window, filling the width. A card leads with what the
+  12 px, two across and three from a 1536 px window, filling its column. A card leads with what the
   Session was doing – its title in `type-heading-16`, the last prompt under it in `type-copy-14`, two
   lines each – then the Project's Drift strip with its active days, framed by the Project above and
   the numbers below. A Session at work or waiting on you must not slip by: its card comes first in its
@@ -49,6 +49,20 @@ window. A view is described here once it is built; until then this section holds
   title and a tertiary Start on a row that takes `alpha-100` on hover – three per card until Show All, the Projects ordered by their newest
   Issue. With no Loose End, Geist's Empty State says *Nothing left half-done.* above the five
   Projects touched last, each with Resume.
+  Under 1280 px Home is that one column, without Needs You. From 1280 px it splits in two, 32 px
+  apart: the Loose Ends on the left – the title, the band and the sections – and a 360 px **right
+  column**, `sticky` 32 px from the top and no taller than the window, scrolling on its own when it
+  holds more, so it stays in view while the Loose Ends scroll. It holds **Needs You** – every open
+  Session waiting on you across the Projects, the longest first, in one `material-small` card: a row
+  per Session with the Project's 24 px avatar, its name in `type-label-13` `muted` over the Session's
+  title in `type-label-14`, and how long it has waited; the row takes `alpha-100` on hover and opens
+  the Project page, with no Resume, since the Session already runs. Under quieter `type-label-12`
+  labels, the same way, *Busy* – the Sessions at work – then *Quiet* – those gone quiet in the last
+  day, since one left overnight is quiet by the morning. When none waits, *No Session waits on you.*
+  stands in for the waiting rows and the heading drops its count; with no Session in any of the
+  three the block is not drawn. Under it Ready to Start, one card across. The Sessions Open tile
+  stays in the band: it counts, Needs You lists. Beside the right column a figure tile is narrower,
+  so in a tile under 224 px its part names take 72 px instead of 112 and leave the bars room.
 - **Projects**: the page's own rail of filters on the left, then every Project as Vercel's project
   card or as a row. The **rail** (§ Components) holds Groups – All, then In Motion, Drifting,
   Parked, each with its dot, then Loose Ends and Focus – then Areas, each with its swatch in its

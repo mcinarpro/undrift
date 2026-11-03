@@ -95,6 +95,34 @@ export function figures(
   };
 }
 
+/** An open Session as Needs You lists it: its Project, its title from the transcript – none
+ * until the Session writes one – and its process. */
+export type NeedRow = { project: Project; open: OpenSession; title: string | null };
+
+/** The title of a Project's Session from its transcript; null until the Session writes one. */
+export const sessionTitle = (p: Project, id: string) => p.sessions.find((s) => s.id === id)?.title ?? null;
+
+/** How long a quiet Session stays in Needs You: a Session left overnight has gone quiet by the
+ * morning, and it is the one Home exists for (ADR 0001). Past a day it no longer waits on anything. */
+const QUIET_KEPT = DAY;
+
+/** The open Sessions across every Project that Home's right column lists: those waiting on you,
+ * then those at work, then those gone quiet in the last day, each the longest in its Status first. */
+export function needsYou(projects: Project[], now: Date): { waiting: NeedRow[]; busy: NeedRow[]; quiet: NeedRow[] } {
+  const rows = projects.flatMap((project) => project.openSessions.map((open) => ({ project, open, title: sessionTitle(project, open.id) })));
+  // A Session with no status change on record has no age to rank it by, so it goes last.
+  const since = (r: NeedRow) => (r.open.statusSince ? time(r.open.statusSince) : Number.MAX_SAFE_INTEGER);
+  const longest = (a: NeedRow, b: NeedRow) => since(a) - since(b);
+  const inStatus = (s: StatusName) => rows.filter((r) => status(r.open, now) === s);
+  return {
+    waiting: inStatus("Waiting").sort(longest),
+    busy: inStatus("Busy").sort(longest),
+    quiet: inStatus("Quiet")
+      .filter((r) => r.open.statusSince && now.getTime() - time(r.open.statusSince) < QUIET_KEPT)
+      .sort(longest),
+  };
+}
+
 /** GLOSSARY.md § Status: waiting for 10 minutes after a turn ends, quiet after that. */
 export function status(open: OpenSession, now: Date): StatusName {
   if (open.status === "busy") return "Busy";

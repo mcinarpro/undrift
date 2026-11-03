@@ -3,14 +3,15 @@ import { Action } from "@/components/action";
 import { Activity, AreaName, AreaSwatch, DEFAULT_BRANCHES, Diff, Empty, LIVE_BADGE, ProjectAvatar, STATUS_DOT, useNow, When } from "@/components/bits";
 import { Icon } from "@/components/icon";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { fileLines, figures, issuesByProject, looseEnds, status, touchedLast, type LooseEnd, type OpenPart, type Part, type Section as SectionName } from "@/lib/home";
+import { fileLines, figures, issuesByProject, looseEnds, needsYou, status, touchedLast, type LooseEnd, type NeedRow, type OpenPart, type Part, type Section as SectionName } from "@/lib/home";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store";
 import type { Issue, Project } from "@/types";
 
 // Home (ADR 0001, DESIGN.md § Layout): the Loose Ends by age as a grid of cards, each led by what
 // the Session was doing, then the Issues ready to Start, a card per Project. The grid fills the
-// full width, where rows left a hole between their parts.
+// full width, where rows left a hole between their parts. From a 1280 px window the Issues move to a
+// column on the right, under the Sessions that need you, so what to Start is on the first screen.
 
 // Two columns, three from a 1536 px window: a fourth left most sections with a hole on the right,
 // and the prompts need the width to read.
@@ -159,7 +160,9 @@ function Hero({ le, section, now }: { le: LooseEnd; section: SectionName; now: D
  * tabular ones (dataviz § Figures). */
 function FigureTile({ label, total, children }: { label: string; total: number; children: ReactNode }) {
   return (
-    <section className={cn(TILE, "gap-4")}>
+    // A container, so its parts fit the tile's own width: beside a right column a tile is narrower
+    // than the window alone would say.
+    <section className={cn(TILE, "@container gap-4")}>
       <div className="flex flex-col gap-1">
         <span className="type-heading-32">{total.toLocaleString("en-GB")}</span>
         <h2 className="type-label-13 text-muted-foreground">{label}</h2>
@@ -176,7 +179,8 @@ function Parts({ parts }: { parts: Part[] }) {
   return (
     <ul className="flex flex-col gap-2">
       {parts.map((p) => (
-        <li key={p.label} className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_auto] items-center gap-3">
+        // In a narrow tile the names give up width before the bars do, or a bar shrinks to a dot.
+        <li key={p.label} className="grid grid-cols-[minmax(0,4.5rem)_minmax(0,1fr)_auto] items-center gap-2 @min-[14rem]:grid-cols-[minmax(0,7rem)_minmax(0,1fr)_auto] @min-[14rem]:gap-3">
           <span className="flex min-w-0 items-center gap-1.5 type-label-13 text-text-2">
             {p.color !== undefined && <AreaSwatch color={p.color ?? undefined} className="size-2" />}
             <span className="truncate">{p.label}</span>
@@ -212,7 +216,7 @@ function OpenSessions({ open }: { open: OpenPart[] }) {
 }
 
 /** A section of cards: its name and count above a grid that fills the width. */
-function Section({ title, count, aside, children }: { title: string; count: number; aside?: ReactNode; children: ReactNode }) {
+function Section({ title, count, aside, grid = GRID, children }: { title: string; count: number; aside?: ReactNode; grid?: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
@@ -222,7 +226,7 @@ function Section({ title, count, aside, children }: { title: string; count: numb
         </h2>
         {aside}
       </div>
-      <div className={GRID}>{children}</div>
+      <div className={grid}>{children}</div>
     </section>
   );
 }
@@ -237,7 +241,7 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /** Issues a Project card shows before Show All: enough to pick the next one, few enough that the
- * Issues stay under the Loose Ends. */
+ * Issues never outweigh the Loose Ends. */
 const ISSUES_PER_CARD = 3;
 
 function ProjectIssues({ project, issues, all }: { project: Project; issues: Issue[]; all: boolean }) {
@@ -267,9 +271,11 @@ function ProjectIssues({ project, issues, all }: { project: Project; issues: Iss
   );
 }
 
-function ReadyToStart({ projects }: { projects: Project[] }) {
+// Two across under the Loose Ends, as the sections are; one in the right column, 360 px wide.
+const ISSUES_GRID = "grid grid-cols-2 gap-4 xl:grid-cols-1";
+
+function ReadyToStart({ groups }: { groups: { project: Project; issues: Issue[] }[] }) {
   const [all, setAll] = useState(false);
-  const groups = issuesByProject(projects);
   if (groups.length === 0) return null;
   const total = groups.reduce((n, g) => n + g.issues.length, 0);
   const hiding = groups.some((g) => g.issues.length > ISSUES_PER_CARD);
@@ -277,6 +283,7 @@ function ReadyToStart({ projects }: { projects: Project[] }) {
     <Section
       title="Ready to Start"
       count={total}
+      grid={ISSUES_GRID}
       aside={
         hiding && (
           <Action variant="tertiary" size="small" aria-expanded={all} onClick={() => setAll(!all)}>
@@ -289,6 +296,78 @@ function ReadyToStart({ projects }: { projects: Project[] }) {
         <ProjectIssues key={g.project.path} project={g.project} issues={g.issues} all={all} />
       ))}
     </Section>
+  );
+}
+
+/** One open Session in Needs You: its Project, its title and since when it is in its Status. The
+ * whole row opens the Project page, which lists the Session with where it runs. It has no Resume:
+ * the Session already runs, and a second `claude` on it would fight the first. */
+function NeedItem({ row, now }: { row: NeedRow; now: Date }) {
+  const openProject = useStore((s) => s.openProject);
+  const { project, open, title } = row;
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => openProject(project.path)}
+        className="flex w-full min-w-0 items-center gap-3 rounded-md px-2 py-2 text-left transition-colors duration-150 hover:bg-alpha-100"
+      >
+        <ProjectAvatar name={project.name} color={project.area?.color} size={24} />
+        <span className="flex min-w-0 grow flex-col">
+          <span className="truncate type-label-13 text-muted-foreground">{project.name}</span>
+          <span className={cn("truncate type-label-14", !title && "text-muted-foreground")}>{title ?? "No title yet"}</span>
+        </span>
+        {open.statusSince && <When iso={open.statusSince} now={now} />}
+      </button>
+    </li>
+  );
+}
+
+/** The Sessions of one Status under a quieter label than the block's own. */
+function NeedGroup({ label, rows, now }: { label: string; rows: NeedRow[]; now: Date }) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1">
+      <h3 className="flex items-center gap-2 px-2 pt-1 type-label-12 text-muted-foreground">
+        {label}
+        <span className="tabular-nums">{rows.length}</span>
+      </h3>
+      <ul className="flex flex-col">
+        {rows.map((r) => (
+          <NeedItem key={r.open.id} row={r} now={now} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** The open Sessions waiting on you across every Project, then, under quieter labels, the ones at
+ * work and the ones gone quiet in the last day – a Session left overnight is quiet by the morning.
+ * A Session in a Project with nothing left uncommitted is no Loose End, so without this block it
+ * would only be counted in the Sessions Open tile. Under 1280 px Home keeps one column and the
+ * Sessions Open tile alone. */
+function NeedsYou({ waiting, busy, quiet, now }: { waiting: NeedRow[]; busy: NeedRow[]; quiet: NeedRow[]; now: Date }) {
+  if (waiting.length + busy.length + quiet.length === 0) return null;
+  return (
+    <section className="hidden flex-col gap-3 xl:flex">
+      <h2 className="flex items-center gap-2 type-label-14 font-medium">
+        Needs You
+        {waiting.length > 0 && <span className="type-label-13 text-muted-foreground tabular-nums">{waiting.length}</span>}
+      </h2>
+      <div className="flex flex-col gap-2 rounded-xl p-2 material-small">
+        {waiting.length > 0 ? (
+          <ul className="flex flex-col">
+            {waiting.map((r) => (
+              <NeedItem key={r.open.id} row={r} now={now} />
+            ))}
+          </ul>
+        ) : (
+          <p className="p-2 type-label-13 text-muted-foreground">No Session waits on you.</p>
+        )}
+        <NeedGroup label="Busy" rows={busy} now={now} />
+        <NeedGroup label="Quiet" rows={quiet} now={now} />
+      </div>
+    </section>
   );
 }
 
@@ -335,22 +414,31 @@ export function Home() {
   const hero = groups[0]?.items[0];
   const rest = groups.map((g) => ({ ...g, items: g.items.filter((le) => le !== hero) })).filter((g) => g.items.length > 0);
   const fig = projects && figures(groups, projects, now);
+  const issues = projects ? issuesByProject(projects) : [];
+  const needs = projects ? needsYou(projects, now) : { waiting: [], busy: [], quiet: [] };
+  const needed = needs.waiting.length + needs.busy.length + needs.quiet.length > 0;
+  // The right column is drawn only with something in it, so an empty one takes no width; under
+  // 1280 px it holds only Ready to Start, since Needs You shows from there.
+  const hasRightColumn = issues.length > 0 || needed;
 
   return (
-    <div className="flex w-full flex-col gap-8 px-8 py-8">
-      <header className="flex flex-col gap-1">
-        <h1 className="type-heading-24">Home</h1>
-        {projects && total > 0 && (
-          <p className="type-copy-14 text-text-2">
-            {total} Loose {total === 1 ? "End" : "Ends"}
-            {night > 0 && ` – ${night} from last night`}.
-          </p>
-        )}
-      </header>
-      {/* Until the bridge's first list, the page holds only its title. */}
-      {projects && (
-        <>
-          {!hero || !fig ? (
+    // One column under 1280 px, where the right column falls under the Loose Ends as Ready to Start
+    // always has. From there it takes 360 px and stays in view while the Loose Ends scroll;
+    // `items-start` keeps it to its own height, or it would fill the row and have nowhere to stick.
+    <div className={cn("grid w-full grid-cols-1 items-start gap-8 px-8 py-8", hasRightColumn && "xl:grid-cols-[minmax(0,1fr)_360px]")}>
+      <div className="flex min-w-0 flex-col gap-8">
+        <header className="flex flex-col gap-1">
+          <h1 className="type-heading-24">Home</h1>
+          {projects && total > 0 && (
+            <p className="type-copy-14 text-text-2">
+              {total} Loose {total === 1 ? "End" : "Ends"}
+              {night > 0 && ` – ${night} from last night`}.
+            </p>
+          )}
+        </header>
+        {/* Until the bridge's first list, the page holds only its title. */}
+        {projects &&
+          (!hero || !fig ? (
             <NothingLeft projects={projects} now={now} />
           ) : (
             <>
@@ -377,9 +465,22 @@ export function Home() {
                 </Section>
               ))}
             </>
+          ))}
+      </div>
+      {hasRightColumn && (
+        // Under 1280 px a column holding only a hidden Needs You would still add the grid's gap.
+        // From there it is no taller than the window under the header, and scrolls on its own, so
+        // its last card stays in reach while the Loose Ends scroll. Its 4 px of padding, taken back
+        // by the margin, keep the cards' edges from being clipped by the scroll box.
+        <aside
+          className={cn(
+            "flex min-w-0 flex-col gap-8 xl:sticky xl:top-7 xl:-m-1 xl:max-h-[calc(100dvh-6.5rem)] xl:overflow-y-auto xl:p-1",
+            issues.length === 0 && "max-xl:hidden",
           )}
-          <ReadyToStart projects={projects} />
-        </>
+        >
+          <NeedsYou waiting={needs.waiting} busy={needs.busy} quiet={needs.quiet} now={now} />
+          <ReadyToStart groups={issues} />
+        </aside>
       )}
     </div>
   );

@@ -1,4 +1,4 @@
-import { dayKey, status, type StatusName } from "@/lib/home";
+import { dayKey, sessionTitle, status, type StatusName } from "@/lib/home";
 import type { OpenSession, Project, Repo, Session } from "@/types";
 
 // What the Projects page, a Project page and the Graph show, worked out from the bridge's Projects
@@ -192,7 +192,7 @@ export function openRows(p: Project, now: Date): OpenRow[] {
   return p.openSessions
     .map((open) => ({
       open,
-      title: p.sessions.find((s) => s.id === open.id)?.title ?? null,
+      title: sessionTitle(p, open.id),
       status: status(open, now),
       where: WHERE[open.entrypoint] ?? open.entrypoint,
     }))

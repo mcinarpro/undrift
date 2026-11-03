@@ -35,9 +35,16 @@ holds a Project.
 _Avoid_: Folder, group, category, workspace
 
 **Home**:
-The first page Undrift opens on: the Loose Ends, newest first, then the Issues ready to Start, and
-nothing else that competes with them.
+The first page Undrift opens on: the Loose Ends, newest first, and beside them, on a wide window,
+Needs You over the Issues ready to Start – on a narrower one the Issues come under the Loose Ends.
+Nothing else competes with them.
 _Avoid_: Overview, dashboard, inbox
+
+**Needs You**:
+The open Sessions across every Project that Home lists beside the Loose Ends: those waiting on
+Mehmet, then those busy, then those gone quiet in the last day – one left overnight is quiet by
+the morning. It lists them; the Sessions Open figure only counts them.
+_Avoid_: Inbox, notifications, attention, alerts
 
 **Loose End**:
 A Project whose git repository holds work not yet committed or not yet pushed, and whose last
