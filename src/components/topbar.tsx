@@ -1,4 +1,5 @@
-import { Key } from "@/components/bits";
+import { Action } from "@/components/action";
+import { Hint, Key } from "@/components/bits";
 import { Icon } from "@/components/icon";
 import { Logo } from "@/components/logo";
 import { NavUser } from "@/components/nav-user";
@@ -16,7 +17,7 @@ const NAV: { page: Page; label: string }[] = [
 // Vercel's header, in one 48 px line: the lockup, the pages as tabs, Find, the account, then the
 // window controls. Each page shows its own title and actions, so the header carries none.
 export function Header() {
-  const { page, project, go, setFindOpen } = useStore();
+  const { page, project, go, setFindOpen, refresh, refreshing } = useStore();
 
   return (
     // The window has no native title bar, so the header is the drag region and a double-click
@@ -63,6 +64,16 @@ export function Header() {
         <span className="grow text-left">Find…</span>
         <Key>F</Key>
       </button>
+
+      {/* Refresh sits between Find and the account: the one action the header holds, since it
+          belongs to no page. It turns while the bridge reads, and stops on its answer. */}
+      <div className="ml-2 flex shrink-0">
+        <Hint label="Refresh (R)">
+          <Action variant="tertiary" size="icon" aria-label="Refresh" onClick={refresh} className="text-muted-foreground hover:text-foreground">
+            <Icon name="refresh" className={cn(refreshing && "animate-spin motion-reduce:animate-none")} />
+          </Action>
+        </Hint>
+      </div>
 
       <div className="ml-2 flex shrink-0">
         <NavUser />

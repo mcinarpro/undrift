@@ -129,6 +129,9 @@ pub struct Read {
 pub struct Snapshot {
     pub projects: Vec<Project>,
     pub read: Read,
+    /// True on the list that answers a rescan, once every pass it asked is in – so a Refresh says
+    /// "current" once, not three times.
+    pub answered: bool,
 }
 
 /// Folders git reads at once, and GitHub repositories `gh` reads at once. Each spends its time
@@ -205,6 +208,11 @@ impl<T: Send + 'static> Background<T> {
             });
             self.rx = Some(rx);
         }
+    }
+
+    /// Whether a pass the window asked for is still to come.
+    fn answering(&self) -> bool {
+        self.ask_pending || self.ask_running
     }
 
     /// The pass's result once it is in, with whether the window asked for it.
@@ -519,7 +527,8 @@ fn run(app: AppHandle, shared: Shared) {
                 })
                 .unwrap_or(false);
             if changed {
-                if let Err(e) = app.emit(PROJECTS_EVENT, &Snapshot { projects: list, read }) {
+                let answered = answer && !history_scan.answering() && !repo_scan.answering() && !github_scan.answering();
+                if let Err(e) = app.emit(PROJECTS_EVENT, &Snapshot { projects: list, read, answered }) {
                     eprintln!("bridge: emit failed: {e}");
                 }
             }

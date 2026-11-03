@@ -16,28 +16,33 @@ const typing = (t: EventTarget | null) =>
   t instanceof HTMLTextAreaElement || (t instanceof HTMLInputElement && !["radio", "checkbox", "button"].includes(t.type));
 
 export default function App() {
-  const { page, setFindOpen, quit } = useStore();
+  const { page, setFindOpen, quit, refresh } = useStore();
   // A Project that left the list – hidden, or its folder gone – leaves its page for Projects.
   const project = useStore((s) => (s.page === "projects" && s.project ? (s.projects?.find((p) => p.path === s.project) ?? null) : null));
 
-  // F or Ctrl K opens Find, Ctrl Q quits (DESIGN.md § Keyboard). Esc is the dialog's own.
+  // F or Ctrl K opens Find, R or Ctrl R refreshes, Ctrl Q quits (DESIGN.md § Keyboard). Esc is the
+  // dialog's own. Ctrl R is taken over, or the webview would reload the window.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const key = e.key.toLowerCase();
+      const plain = !e.ctrlKey && !e.altKey && !e.metaKey && !typing(e.target);
       if (e.ctrlKey && !e.altKey && !e.shiftKey && key === "k") {
         e.preventDefault();
         setFindOpen(true);
       } else if (e.ctrlKey && !e.altKey && !e.shiftKey && key === "q") {
         e.preventDefault();
         quit();
-      } else if (key === "f" && !e.ctrlKey && !e.altKey && !e.metaKey && !typing(e.target)) {
+      } else if ((e.ctrlKey && !e.altKey && !e.shiftKey && key === "r") || (plain && key === "r")) {
+        e.preventDefault();
+        refresh();
+      } else if (plain && key === "f") {
         e.preventDefault();
         setFindOpen(true);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [setFindOpen, quit]);
+  }, [setFindOpen, quit, refresh]);
 
   return (
     // One provider shares the Hints' 150 ms delay: once one is open, moving to the next shows it at once.

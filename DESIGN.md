@@ -15,17 +15,19 @@ window. A view is described here once it is built; until then this section holds
 - **Header** (48 px), the window's only bar, left to right: the lockup, which leads to Home · Home, Projects, Graph as
   Geist's pill tabs – 32 px, 6 px radius, `type-label-14`, the current page on `alpha-200` in
   `text`, `alpha-100` under the pointer, `text-2` otherwise; a Project page keeps Projects current ·
-  *Find…* (`F`), edged on `surface`, 240 px, pushed right · the account's 32 px round avatar (the
+  *Find…* (`F`), edged on `surface`, 240 px, pushed right · a tertiary icon **Refresh** (*Refresh
+  (R)* in its Hint), turning while the bridge reads · the account's 32 px round avatar (the
   first letter of the login, or an empty circle when `gh` is signed out), an `alpha-100` ring on
   hover · 12 px of space · minimize, maximize and close (close hides to the tray). It names no page
-  and holds no breadcrumb or action: each page shows its own. The avatar opens the **NavUser**, as
+  and holds no breadcrumb, and Refresh is its one action, since it belongs to no page: each page
+  shows its own. The avatar opens the **NavUser**, as
   shadcn's nav-user block, downwards and aligned to its end – the name and `@login` of the account
   `gh` is signed in to (*Not signed in* without one), then Open GitHub Profile, Settings, the theme
   (System, Light, Dark) and Quit. The window has no native decorations, so the header is the title
   bar: its empty parts drag the window and a double-click maximizes; the lockup, the tabs, Find, the
   avatar and the controls never drag.
 - **Find** (`F` or `Ctrl K`): Geist's Command Menu over Projects, the last Sessions (Enter
-  resumes), the pages and the actions.
+  resumes), the pages and the actions – the theme, Refresh and Quit.
 - **Home**, the first page (ADR 0001): the Loose Ends in three sections – Last Night (since 18:00 the
   day before), This Week, Older – newest first; within a section a busy or waiting Session first, then the biggest diff. Each shows
   its Project, the last Session's title and last prompt, files changed with +/− (left out
@@ -289,7 +291,8 @@ the information.
 
 ## Keyboard
 
-`F` or `Ctrl K` opens Find · `/` jumps to the Projects search · `Esc` closes Find · `Ctrl Q` quits.
+`F` or `Ctrl K` opens Find · `/` jumps to the Projects search · `Esc` closes Find · `R` or `Ctrl R`
+asks the bridge to read everything again, and a toast says *Refreshed.* once it has · `Ctrl Q` quits.
 Focus is Geist's double ring: `0 0 0 2px` `surface` (background-100), then `0 0 0 4px` `focus`; text
 fields show focus with their caret and frame instead. That frame is `--ud-focus-border`, Geist's field
 halo (a gray-alpha-600 edge in a 4 px halo), and it stays while the pointer is over the field. Segmented

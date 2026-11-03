@@ -47,7 +47,7 @@ export async function watchUser(onUser: (user: NavUser | null, avatar: string | 
 export async function watchProjects(onSnapshot: (snapshot: Snapshot) => void): Promise<void> {
   onSnapshot = later(onSnapshot);
   if (!inTauri) {
-    onSnapshot({ projects: [], read: { sessions: true, git: true, github: true } });
+    onSnapshot({ projects: [], read: { sessions: true, git: true, github: true }, answered: false });
     return;
   }
   await listen<Snapshot>("projects", (e) => onSnapshot(e.payload));
@@ -63,6 +63,9 @@ export const letGo = (path: string) => (inTauri ? invoke<void>("let_go", { path 
 export const undoLetGo = (path: string) => (inTauri ? invoke<void>("undo_let_go", { path }) : Promise.resolve());
 /** Puts the Project in Focus, or takes it out; the bridge refuses a fourth. */
 export const setFocus = (path: string, on: boolean) => (inTauri ? invoke<void>("set_focus", { path, on }) : Promise.resolve());
+
+/** Asks the bridge to read everything again; it answers with a `projects` event marked `answered`. */
+export const rescan = () => (inTauri ? invoke<void>("rescan") : Promise.resolve());
 
 export const quit = () => (inTauri ? invoke<void>("quit") : Promise.resolve());
 

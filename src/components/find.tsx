@@ -64,7 +64,7 @@ function ResultCount() {
 // Find (F or Ctrl K): open a Project, resume one of the last Sessions, jump to a page or run an
 // action, as Vercel's Find and Geist's Command Menu.
 export function Find() {
-  const { findOpen, setFindOpen, go, openProject, resume, theme, setTheme, quit } = useStore();
+  const { findOpen, setFindOpen, go, openProject, resume, theme, setTheme, quit, refresh } = useStore();
   const projects = useStore((s) => s.projects) ?? [];
 
   return (
@@ -149,6 +149,18 @@ export function Find() {
                 {t.label}
               </CommandItem>
             ))}
+            <CommandItem
+              value="action refresh"
+              onSelect={() => {
+                refresh();
+                setFindOpen(false);
+              }}
+              className={ROW}
+            >
+              <Icon name="refresh" className="text-muted-foreground" />
+              Refresh
+              <CommandShortcut className="tracking-normal">R</CommandShortcut>
+            </CommandItem>
             <CommandItem value="action quit undrift" onSelect={quit} className={ROW}>
               <Icon name="quit" className="text-muted-foreground" />
               Quit

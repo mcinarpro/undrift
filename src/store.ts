@@ -40,6 +40,8 @@ type State = {
   sort: Sort;
   view: View;
   findOpen: boolean;
+  /** A Refresh asked and not yet answered; a second one meanwhile does nothing. */
+  refreshing: boolean;
   theme: ThemeChoice;
   /** Null until the cache or `gh` answers, and while `gh` has never seen an account: a `gh` that
    * fails later keeps the cached one. */
@@ -66,15 +68,17 @@ type State = {
   start: (path: string, issue: number) => void;
   letGo: (path: string, name: string) => void;
   setFocus: (path: string, on: boolean) => void;
+  refresh: () => void;
 };
 
-export const useStore = create<State>((set) => ({
+export const useStore = create<State>((set, get) => ({
   page: "home",
   project: null,
   groupFilter: { kind: "all" },
   sort: saved("projects.sort", SORTS.map((s) => s.value), "drift"),
   view: saved<View>("projects.view", ["grid", "list"], "grid"),
   findOpen: false,
+  refreshing: false,
   theme: savedTheme(),
   user: null,
   userKnown: false,
@@ -98,6 +102,15 @@ export const useStore = create<State>((set) => ({
     set({ theme });
   },
   quit: () => void bridge.quit().catch((e) => console.error("quit:", e)),
+  // The toast comes with the bridge's answer, not with the key: *Refreshed.* means the list is current.
+  refresh: () => {
+    if (get().refreshing) return;
+    set({ refreshing: true });
+    bridge.rescan().catch((e) => {
+      set({ refreshing: false });
+      failed("refresh", e);
+    });
+  },
   resume: (path, sessionId) => void bridge.resume(path, sessionId).catch((e) => failed("resume the Session", e)),
   newSession: (path) => void bridge.newSession(path).catch((e) => failed("open a new Session", e)),
   start: (path, issue) => void bridge.start(path, issue).catch((e) => failed("start the Issue", e)),
@@ -124,8 +137,11 @@ export const useStore = create<State>((set) => ({
 
 // A Project that left the list – hidden, or its folder gone – closes its page for good, so it
 // cannot reopen by surprise if it comes back on a later refresh.
-bridge.watchProjects(({ projects, read }) =>
-  useStore.setState((s) => ({ projects, read, project: s.project && projects.some((p) => p.path === s.project) ? s.project : null })),
+bridge.watchProjects(({ projects, read, answered }) =>
+  useStore.setState((s) => {
+    if (answered && s.refreshing) toasts.add({ title: "Refreshed." });
+    return { projects, read, refreshing: s.refreshing && !answered, project: s.project && projects.some((p) => p.path === s.project) ? s.project : null };
+  }),
 ).catch((e) => console.error("projects:", e));
 // `gh` that cannot answer – signed out or offline – keeps the cached account, as before it was asked.
 bridge.watchUser((user, avatar) => useStore.setState(user ? { user, avatar, userKnown: true } : { userKnown: true })).catch((e) => console.error("nav user:", e));

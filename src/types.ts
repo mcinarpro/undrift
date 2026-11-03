@@ -118,7 +118,8 @@ export type Read = {
 };
 
 /** What the bridge sends: the Projects, and which passes they hold. */
-export type Snapshot = { projects: Project[]; read: Read };
+/** The bridge's list; `answered` is true on the one that answers a Refresh, once every pass is in. */
+export type Snapshot = { projects: Project[]; read: Read; answered: boolean };
 
 /** The cached NavUser, and whether `gh api user` already answered: an answer that went out before
  * the window listened still tells it to stop waiting. */

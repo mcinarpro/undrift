@@ -12,6 +12,7 @@ import {
   LayoutGrid,
   List,
   LogOut,
+  RefreshCw,
   Minus,
   Monitor,
   Moon,
@@ -44,6 +45,7 @@ const ICONS = {
   // A page of Undrift, where ExternalLink leaves for the browser.
   open: ArrowUpRight,
   quit: LogOut,
+  refresh: RefreshCw,
   minimize: Minus,
   maximize: Square,
   close: X,

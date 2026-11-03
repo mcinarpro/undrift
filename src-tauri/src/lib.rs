@@ -9,7 +9,7 @@ use tauri::{AppHandle, Manager, WindowEvent};
 /// `None` until the bridge built its first one.
 #[tauri::command]
 async fn projects_now(shared: tauri::State<'_, bridge::Shared>) -> Result<Option<bridge::Snapshot>, ()> {
-    Ok(shared.lock().ok().and_then(|l| l.projects.clone().map(|projects| bridge::Snapshot { projects, read: l.read })))
+    Ok(shared.lock().ok().and_then(|l| l.projects.clone().map(|projects| bridge::Snapshot { projects, read: l.read, answered: false })))
 }
 
 /// The Project the window names, from the bridge's own list: the window never chooses the folder
