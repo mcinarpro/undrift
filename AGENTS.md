@@ -22,8 +22,9 @@ Undrift watches someone's own work, so the bridge is a read-only observer:
 - In a Project folder it runs `git` and `gh` read-only: never `fetch`, never a write. Every
   `gh` call has a timeout. From git it takes numbers, file names, the branch, the subjects of the
   last commit and of the commits not pushed, and the `origin` URL, never file contents.
-- Over the network it reaches only GitHub: `gh` read-only for Issues and the NavUser, and that
-  account's avatar, cached on disk. It never writes to GitHub.
+- Over the network it reaches only GitHub: `gh` read-only for Issues, each repository's
+  description and the NavUser, and that account's avatar, cached on disk. It never writes to
+  GitHub.
 - It calls no model. The only processes it starts are terminals running `claude`: in a
   Project folder for Resume, New Session and Start (an Issue as the first prompt).
 

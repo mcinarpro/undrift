@@ -102,19 +102,20 @@ export function Badge({ size = "md", className, children }: { size?: "md" | "sm"
 }
 
 /** A Session's Status: a Badge when it is busy or waiting on you, the dot and the word when quiet.
- * Several Sessions in one Status are counted: *2 Sessions busy*. */
-export function StatusMark({ status, count = 1 }: { status: StatusName; count?: number }) {
+ * Several Sessions in one Status are counted: *2 Sessions busy*. A `label` says something else in
+ * the same mark, as a Project page's *2 Sessions open*, worn in the Status of the most pressing. */
+export function StatusMark({ status, count = 1, label }: { status: StatusName; count?: number; label?: string }) {
   const dot = <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[status])} />;
-  const label = count > 1 ? `${count} Sessions ${status.toLowerCase()}` : status;
+  const text = label ?? (count > 1 ? `${count} Sessions ${status.toLowerCase()}` : status);
   return LIVE_BADGE[status] ? (
     <Badge className={cn(LIVE_BADGE[status], "tabular-nums")}>
       {dot}
-      {label}
+      {text}
     </Badge>
   ) : (
     <span className="flex shrink-0 items-center gap-1.5 type-label-13 text-text-2 tabular-nums">
       {dot}
-      {label}
+      {text}
     </span>
   );
 }

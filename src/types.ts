@@ -56,6 +56,8 @@ export type Repo = {
   commits: string[];
   /** `owner/name` of the `origin` remote when it is on GitHub. */
   github: string | null;
+  /** The GitHub repository's description, read with `gh`; null without one. */
+  description: string | null;
   /** The changed files, the most changed lines first, at most 50. */
   files: FileChange[];
 };

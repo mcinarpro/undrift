@@ -1,5 +1,6 @@
-//! The open Issues of a Project's GitHub repository (GLOSSARY.md § Issue), read with
-//! `gh issue list`, read-only and with `gh::run`'s timeout.
+//! What a Project's GitHub repository says about itself: its open Issues (GLOSSARY.md § Issue),
+//! read with `gh issue list`, and its one-line description, read with `gh repo view`. Both are
+//! read-only and under `gh::run`'s timeout.
 
 use super::gh;
 use serde::{Deserialize, Serialize};
@@ -44,6 +45,24 @@ pub fn list(repo: &str) -> Option<Vec<Issue>> {
     parse(&gh::run(&args)?)
 }
 
+#[derive(Deserialize)]
+struct RepoLine {
+    #[serde(default)]
+    description: Option<String>,
+}
+
+/// The description of `owner/name`: `Some(None)` when the repository has none, `None` when `gh`
+/// fails, so the caller can keep what it had.
+pub fn description(repo: &str) -> Option<Option<String>> {
+    parse_description(&gh::run(&["repo", "view", repo, "--json", "description"])?)
+}
+
+/// GitHub sends an empty string for a repository without a description, which says nothing.
+fn parse_description(json: &str) -> Option<Option<String>> {
+    let line: RepoLine = serde_json::from_str(json).ok()?;
+    Some(line.description.map(|d| d.trim().to_owned()).filter(|d| !d.is_empty()))
+}
+
 fn parse(json: &str) -> Option<Vec<Issue>> {
     let lines: Vec<IssueLine> = serde_json::from_str(json).ok()?;
     Some(
@@ -74,5 +93,13 @@ mod tests {
     fn an_empty_list_is_no_issues_and_garbage_is_a_failure() {
         assert_eq!(parse("[]"), Some(Vec::new()));
         assert_eq!(parse("could not resolve to a Repository"), None);
+    }
+
+    #[test]
+    fn a_description_is_kept_and_an_empty_one_is_none() {
+        assert_eq!(parse_description(r#"{"description":"A desktop cockpit."}"#), Some(Some("A desktop cockpit.".to_string())));
+        assert_eq!(parse_description(r#"{"description":""}"#), Some(None));
+        assert_eq!(parse_description(r#"{"description":null}"#), Some(None));
+        assert_eq!(parse_description("could not resolve to a Repository"), None);
     }
 }

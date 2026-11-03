@@ -52,8 +52,9 @@ pub const USER_EVENT: &str = "user";
 /// Session opens or closes, the config changes or the window asks.
 const HISTORY_EVERY_TICKS: u32 = 600;
 const REPO_EVERY_TICKS: u32 = 300;
-/// Issues come over the network, so they are not reread on a Session opening or closing.
-const ISSUES_EVERY_TICKS: u32 = 300;
+/// Issues and repository descriptions come over the network, so they are not reread on a Session
+/// opening or closing.
+const GITHUB_EVERY_TICKS: u32 = 300;
 /// Days of Activity the window draws (GLOSSARY.md § Drift strip).
 const WINDOW_DAYS: i64 = 30;
 /// Sessions listed per Project, newest first.
@@ -179,6 +180,13 @@ impl<T: Send + 'static> Background<T> {
     }
 }
 
+/// One GitHub repository as a pass read it; each part is `None` when its `gh` call failed.
+struct GitHubRead {
+    repo: String,
+    issues: Option<Vec<Issue>>,
+    description: Option<Option<String>>,
+}
+
 /// What the bridge knows, from which the Project list is built.
 #[derive(Default)]
 struct Known {
@@ -188,6 +196,8 @@ struct Known {
     live: Vec<Session>,
     /// Open Issues by `owner/name`.
     issues: HashMap<String, Vec<Issue>>,
+    /// Repository descriptions by `owner/name`; `None` for a repository without one.
+    descriptions: HashMap<String, Option<String>>,
     let_go: let_go::LetGo,
 }
 
@@ -250,7 +260,10 @@ impl Known {
                     name: path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.display().to_string()),
                     focus_since: focus.get(&path).map(|s| s.to_string()),
                     area: areas.get(&path).cloned(),
-                    repo: read.map(|r| r.repo.clone()),
+                    repo: read.map(|r| Repo {
+                        description: r.repo.github.as_ref().and_then(|g| self.descriptions.get(g)).cloned().flatten(),
+                        ..r.repo.clone()
+                    }),
                     active_days: days.into_iter().filter(|d| *d >= first_day).collect(),
                     last_activity,
                     open_sessions: open.iter().map(|s| open_view(s)).collect(),
@@ -337,7 +350,7 @@ fn run(app: AppHandle, shared: Shared) {
     let mut known = Known { discovered: config::discover(settings.config()), let_go: let_go::read(), ..Default::default() };
     let mut history_scan: Background<Vec<Record>> = Background::new();
     let mut repo_scan: Background<HashMap<PathBuf, RepoRead>> = Background::new();
-    let mut issue_scan: Background<HashMap<String, Vec<Issue>>> = Background::new();
+    let mut github_scan: Background<Vec<GitHubRead>> = Background::new();
     let mut github = BTreeSet::new();
     let mut n: u32 = 0;
     loop {
@@ -377,19 +390,27 @@ fn run(app: AppHandle, shared: Shared) {
             answer |= was_asked;
         }
 
-        // Issues are read once per GitHub repository, in sequence, and again as soon as a repo scan
-        // finds a repository that was not there before, so a new Project gets its Issues at once.
+        // Issues and descriptions are read once per GitHub repository, in sequence, and again as soon
+        // as a repo scan finds a repository that was not there before, so a new Project gets them at once.
         let now = known.github();
         let github_changed = now != github;
         github = now;
         let repos = github.clone();
-        issue_scan.run(n % ISSUES_EVERY_TICKS == 0 || github_changed, asked, move || {
-            repos.into_iter().filter_map(|r| issues::list(&r).map(|i| (r, i))).collect()
+        github_scan.run(n % GITHUB_EVERY_TICKS == 0 || github_changed, asked, move || {
+            repos.into_iter().map(|r| GitHubRead { issues: issues::list(&r), description: issues::description(&r), repo: r }).collect()
         });
-        if let Some((found, was_asked)) = issue_scan.poll() {
-            // A call that failed keeps the Issues it had, and a repository no Project has any more goes.
-            known.issues.extend(found);
+        if let Some((found, was_asked)) = github_scan.poll() {
+            // A call that failed keeps what it had, and a repository no Project has any more goes.
+            for f in found {
+                if let Some(i) = f.issues {
+                    known.issues.insert(f.repo.clone(), i);
+                }
+                if let Some(d) = f.description {
+                    known.descriptions.insert(f.repo, d);
+                }
+            }
             known.issues.retain(|r, _| github.contains(r));
+            known.descriptions.retain(|r, _| github.contains(r));
             dirty = true;
             answer |= was_asked;
         }

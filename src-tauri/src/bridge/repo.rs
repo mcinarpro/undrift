@@ -28,6 +28,9 @@ pub struct Repo {
     pub github: Option<String>,
     /// The changed files by name, the most changed lines first, at most `MAX_FILES`.
     pub files: Vec<FileChange>,
+    /// The GitHub repository's description. git does not know it, so `read` leaves it `None` and
+    /// the bridge fills it from `gh` alongside the Issues.
+    pub description: Option<String>,
 }
 
 /// Files kept per repo: enough for Home's big tile, few enough that a stray untracked folder
@@ -95,7 +98,7 @@ pub fn read(cwd: &Path) -> Option<RepoRead> {
     let commit_days = git(cwd, &["log", "--branches", "--since=30 days ago", "--date=format-local:%Y-%m-%d", "--format=%cd"])
         .map(|o| o.lines().map(str::trim).filter(|l| !l.is_empty()).map(str::to_owned).collect())
         .unwrap_or_default();
-    Some(RepoRead { repo: Repo { branch, head_at, head_subject, changed, diff, unpushed, commits: commits.unwrap_or_default(), github, files }, last_commit_at, commit_days })
+    Some(RepoRead { repo: Repo { branch, head_at, head_subject, changed, diff, unpushed, commits: commits.unwrap_or_default(), github, files, description: None }, last_commit_at, commit_days })
 }
 
 /// Stdout of a git command in `cwd`, `None` when git fails (not a repo, no upstream…).

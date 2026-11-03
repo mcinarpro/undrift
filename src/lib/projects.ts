@@ -173,3 +173,28 @@ export function earlierSessions(p: Project): Session[] {
   const open = new Set(p.openSessions.map((o) => o.id));
   return p.sessions.slice(1).filter((s) => !open.has(s.id));
 }
+
+/** The earlier Sessions the split Resume offers: those of the last week, since an older one is
+ * still a click away in Earlier Sessions. */
+export function recentSessions(p: Project, now: Date): Session[] {
+  return earlierSessions(p).filter((s) => now.getTime() - time(s.lastActivity) < 7 * DAY);
+}
+
+/** An open Session as Sessions Open lists it: its title from the transcript, its Status, and where
+ * it runs. A Session that has not written its title yet has none. */
+export type OpenRow = { open: OpenSession; title: string | null; status: StatusName; where: string };
+
+/** Claude Code names where a Session runs by its entrypoint; the window says it in words. */
+const WHERE: Record<string, string> = { cli: "terminal", "claude-desktop": "desktop" };
+
+/** Every open Session, the ones at work or waiting on you first, then the latest change. */
+export function openRows(p: Project, now: Date): OpenRow[] {
+  return p.openSessions
+    .map((open) => ({
+      open,
+      title: p.sessions.find((s) => s.id === open.id)?.title ?? null,
+      status: status(open, now),
+      where: WHERE[open.entrypoint] ?? open.entrypoint,
+    }))
+    .sort((a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) || time(b.open.statusSince) - time(a.open.statusSince));
+}

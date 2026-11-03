@@ -1,6 +1,7 @@
 import {
   ArrowUpDown,
   Bot,
+  ChevronDown,
   Ellipsis,
   ExternalLink,
   Folders,
@@ -55,6 +56,7 @@ const ICONS = {
   grid: LayoutGrid,
   list: List,
   sort: ArrowUpDown,
+  chevron: ChevronDown,
 } as const;
 
 export type IconName = keyof typeof ICONS;

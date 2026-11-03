@@ -1,18 +1,20 @@
 import type { ReactNode } from "react";
 import { openExternal } from "@/bridge";
-import { Action } from "@/components/action";
-import { Activity, AreaName, Diff, Field, Gauge, GroupBadge, StatusMark, useNow, When } from "@/components/bits";
+import { Action, SplitAction } from "@/components/action";
+import { Activity, AreaName, AreaSwatch, Badge, Diff, Field, Gauge, GroupBadge, ProjectAvatar, StatusMark, useNow, When } from "@/components/bits";
 import { Icon } from "@/components/icon";
+import { failed } from "@/components/toast";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import { DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { fileLines, status } from "@/lib/home";
-import { drift, earlierSessions, focusDrift, group, lastSession } from "@/lib/projects";
+import { drift, earlierSessions, focusDrift, group, lastSession, openRows, recentSessions, type OpenRow } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store";
 import type { Project as ProjectData } from "@/types";
 
-// A Project page (DESIGN.md § Layout), shaped like Vercel's Project Overview: Where You Left Off
-// answers "what was done here, and what is left?" before Resume, then the Issues, the Earlier
-// Sessions, Git and Focus.
+// A Project page (DESIGN.md § Layout), shaped like Vercel's Project Overview: a header with who the
+// Project is and its actions, then Where You Left Off answers "what was done here, and what is
+// left?", then the Sessions open, the Issues, the Earlier Sessions, Git and Focus.
 
 /** The page's breadcrumb, Area / Project: the Area leads back to Projects filtered by it. */
 function ProjectBreadcrumb({ project }: { project: ProjectData }) {
@@ -63,7 +65,6 @@ function None({ children }: { children: ReactNode }) {
 }
 
 function WhereYouLeftOff({ project, now }: { project: ProjectData; now: Date }) {
-  const { resume, newSession } = useStore();
   const last = lastSession(project);
   const st = last?.open && status(last.open, now);
   const left = project.repo && (project.repo.changed > 0 || (project.repo.unpushed ?? 0) > 0);
@@ -100,18 +101,115 @@ function WhereYouLeftOff({ project, now }: { project: ProjectData; now: Date }) 
             </Field>
           )}
         </dl>
-        <div className="flex items-center gap-2">
-          {last && (
-            <Action variant="primary" size="medium" onClick={() => resume(project.path, last.session.id)}>
-              <Icon name="resume" /> Resume
-            </Action>
-          )}
-          <Action variant={last ? "secondary" : "primary"} size="medium" onClick={() => newSession(project.path)}>
-            <Icon name="start" /> New Session
-          </Action>
-        </div>
       </div>
     </section>
+  );
+}
+
+// Menu rows take Geist's 36 px height and 6 px radius, the same as the other menus, so a row is
+// as easy a target here as anywhere in the window.
+const MENU_ROW = "h-9 gap-2 rounded-md px-2 text-sm";
+
+/** Resume the last Session, the page's only primary button; its menu starts a new Session or
+ * resumes one of the week's earlier ones. With no Session yet, New Session takes its place. */
+function ResumeAction({ project, now }: { project: ProjectData; now: Date }) {
+  const resume = useStore((s) => s.resume);
+  const newSession = useStore((s) => s.newSession);
+  const last = lastSession(project)?.session;
+  if (!last) {
+    return (
+      <Action variant="primary" size="medium" onClick={() => newSession(project.path)}>
+        <Icon name="start" /> New Session
+      </Action>
+    );
+  }
+  const recent = recentSessions(project, now);
+  return (
+    <SplitAction
+      onClick={() => resume(project.path, last.id)}
+      menuLabel="More Sessions"
+      menu={
+        <>
+          <DropdownMenuItem onClick={() => newSession(project.path)} className={MENU_ROW}>
+            <Icon name="start" className="text-muted-foreground" />
+            New Session
+          </DropdownMenuItem>
+          {recent.length > 0 && (
+            <>
+              <DropdownMenuSeparator className="my-1" />
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="px-2 pt-1.5 pb-1 type-label-12 font-normal text-muted-foreground">Last 7 Days</DropdownMenuLabel>
+                {recent.map((s) => (
+                  <DropdownMenuItem key={s.id} onClick={() => resume(project.path, s.id)} className={MENU_ROW} aria-label={`Resume ${s.title}`}>
+                    <Icon name="resume" className="text-muted-foreground" />
+                    <span className="grow truncate">{s.title}</span>
+                    <When iso={s.lastActivity} now={now} />
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuGroup>
+            </>
+          )}
+        </>
+      }
+    >
+      <Icon name="resume" /> Resume
+    </SplitAction>
+  );
+}
+
+/** The Area as a Badge beside the title: its swatch and its name, Unsorted in the Parked grey. */
+function AreaBadge({ project }: { project: ProjectData }) {
+  return (
+    <Badge className="bg-secondary text-text-2">
+      <AreaSwatch color={project.area?.color} className="size-2" />
+      {project.area?.name ?? "Unsorted"}
+    </Badge>
+  );
+}
+
+/** The page header, as on Vercel's Project Overview: who the Project is and what runs on it on the
+ * left, its actions on the right. The name truncates before anything else gives way, so the
+ * actions never wrap under it. */
+function ProjectHeader({ project, rows, now }: { project: ProjectData; rows: OpenRow[]; now: Date }) {
+  const repo = project.repo;
+  return (
+    <header className="flex min-w-0 flex-col gap-1">
+      <ProjectBreadcrumb project={project} />
+      <div className="flex min-w-0 items-center gap-3">
+        <ProjectAvatar name={project.name} color={project.area?.color} />
+        <h1 className="min-w-0 truncate type-heading-24">{project.name}</h1>
+        <AreaBadge project={project} />
+        {/* The most pressing Status leads, so two Sessions open wear Busy's colour when one is busy. */}
+        {rows.length > 0 && <StatusMark status={rows[0].status} label={rows.length > 1 ? `${rows.length} Sessions open` : undefined} />}
+        <div className="ml-auto flex shrink-0 items-center gap-2 pl-3">
+          <ResumeAction project={project} now={now} />
+          {repo?.github && (
+            <Action variant="secondary" size="medium" onClick={() => openExternal(`https://github.com/${repo.github}`).catch((e) => failed("open GitHub", e))}>
+              <Icon name="profile" /> Open on GitHub
+            </Action>
+          )}
+        </div>
+      </div>
+      {repo?.description && <p className="max-w-3xl type-copy-14 text-text-2">{repo.description}</p>}
+    </header>
+  );
+}
+
+/** Every open Session, one row each. No button: a Session already runs in its own window, and
+ * Undrift observes it, never drives it. */
+function SessionsOpen({ rows, now }: { rows: OpenRow[]; now: Date }) {
+  if (rows.length === 0) return null;
+  return (
+    <Panel title="Sessions Open" count={rows.length}>
+      {rows.map((r) => (
+        <div key={r.open.id} className={ROW}>
+          <span className={cn("grow truncate type-label-14", !r.title && "text-muted-foreground")}>{r.title ?? "No title yet"}</span>
+          <StatusMark status={r.status} />
+          {r.open.statusSince && <When iso={r.open.statusSince} now={now} />}
+          <span className="type-label-13 text-muted-foreground">{r.where}</span>
+        </div>
+      ))}
+    </Panel>
   );
 }
 
@@ -288,15 +386,14 @@ function Focus({ project, now }: { project: ProjectData; now: Date }) {
 
 export function Project({ project }: { project: ProjectData }) {
   const now = useNow();
+  const rows = openRows(project, now);
   return (
     <div className="flex w-full flex-col gap-8 px-8 py-8">
-      <header className="flex min-w-0 flex-col gap-1">
-        <ProjectBreadcrumb project={project} />
-        <h1 className="truncate type-heading-24">{project.name}</h1>
-      </header>
+      <ProjectHeader project={project} rows={rows} now={now} />
       <WhereYouLeftOff project={project} now={now} />
       <div className="grid grid-cols-1 items-start gap-8 xl:grid-cols-2">
         <div className="flex min-w-0 flex-col gap-8">
+          <SessionsOpen rows={rows} now={now} />
           <Issues project={project} now={now} />
           <EarlierSessions project={project} now={now} />
         </div>

@@ -1,6 +1,8 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
+import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 // Geist's Button on top of the generated one, which stays as shadcn wrote it. Every class here
@@ -63,5 +65,46 @@ export function Action({ variant = "primary", size = "medium", className, ...pro
       className={cn(action({ variant, size }), className)}
       {...props}
     />
+  );
+}
+
+/** Geist's split button: the action itself, and beside it a chevron that opens the menu of its
+ * alternatives. The two halves share one shape, split by a 1 px line in the label's colour, so they
+ * read as one button with two targets. The menu's items are the caller's. */
+export function SplitAction({
+  onClick,
+  children,
+  menuLabel,
+  menu,
+}: {
+  onClick: () => void;
+  children: ReactNode;
+  /** Names the chevron for screen readers, which see only an icon. */
+  menuLabel: string;
+  menu: ReactNode;
+}) {
+  return (
+    <div className="flex">
+      <Action variant="primary" size="medium" onClick={onClick} className="rounded-r-none">
+        {children}
+      </Action>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Action
+              variant="primary"
+              size="medium"
+              aria-label={menuLabel}
+              className="w-9 rounded-l-none px-0 shadow-[inset_1px_0_0_color-mix(in_oklab,var(--ud-on-button)_25%,transparent)]"
+            />
+          }
+        >
+          <Icon name="chevron" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-72 rounded-xl p-1 ring-0 shadow-(--ud-shadow-menu)">
+          {menu}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }

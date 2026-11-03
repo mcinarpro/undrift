@@ -69,13 +69,21 @@ window. A view is described here once it is built; until then this section holds
   is 1120 px wide, four from 1472 px, so a card keeps at least 360 px. A **row** – avatar, name and
   path, Area, the group Badge, branch, `+n −n`, last Activity – sits on columns shared by every row
   of one 6 px card, takes `alpha-100` on hover, and opens its Project page, as a card does.
-- **Project page**, shaped like Vercel's Project Overview: a page header – the breadcrumb, *Area /
-  Project*, whose Area leads back to Projects filtered by it, above the Project's name as the
-  title – then a **Where You Left Off** card – the Drift
-  strip, Drift, Last Activity, Area, Last Session with its Status when open, the diff stat, Last
-  Prompt – with the page's only primary Resume and New Session; then two columns from 1280 px: the
-  Project's Issues (each with Start) and Earlier Sessions (each with Resume) on the left, Git and
-  Focus on the right. Git says what was done and what is left – the branch, the GitHub repository,
+- **Project page**, shaped like Vercel's Project Overview. Its page header holds the breadcrumb,
+  *Area / Project*, whose Area leads back to Projects filtered by it; then one line – the 32 px
+  avatar, the name as the `h1` in `type-heading-24`, the Area as a Badge (its swatch and name on
+  `raised` in `text-2`) and, while a Session is open, its Status as on Home, or *2 Sessions open*
+  in the most pressing one's – with the actions at its end: the page's only primary button, a split
+  **Resume** of the last Session whose menu holds New Session and Resume on each earlier Session of
+  the last 7 days (*Last 7 Days*), or **New Session** with no Session yet, then a secondary
+  **Open on GitHub** when the repository is on GitHub. The name truncates first, so the actions
+  never wrap under it. Under that line, the GitHub repository's description in `type-copy-14`
+  `text-2` when it has one. Then a **Where You Left Off** card, with no button – the Drift strip,
+  Drift, Last Activity, Area, Last Session with its Status when open, the diff stat, Last Prompt;
+  then two columns from 1280 px: **Sessions Open** while a Session is open – a row each, the
+  Session's title, its Status, since when and *terminal* or *desktop*, and no button, since it runs
+  in its own window – the Project's Issues (each with Start) and Earlier Sessions (each with
+  Resume) on the left, Git and Focus on the right. Git says what was done and what is left – the branch, the GitHub repository,
   the last commit, the **Commits Not Pushed** by subject, newest first, and the **Changed Files**
   with `+n −n` or *new*. Focus is read-only: a Gauge of the days with Activity since the Project was
   put in Focus.
@@ -269,6 +277,10 @@ The logo comes from `art/` – never redrawn, never retyped; in the interface it
   - `loading` is Geist's loading button: the Spinner takes the leading icon's place, the label stays,
     and the button keeps its focus, says `aria-busy` and ignores clicks.
   - Labels are Title Case: *Open Folder*, *New Session*, *Add to Focus*.
+  - **Split** (`SplitAction`) is Geist's split button, primary and medium: the action, then a 36 px
+    chevron square named for screen readers that opens a menu of its alternatives below its end.
+    The two halves share one shape – square where they meet – split by a 1 px line of `on-button`
+    at 25%, and each takes its own hover.
 - **Search field** (the Projects search) is Geist's Input: 36 px, `surface`, an `alpha-400` edge that
   turns `alpha-500` on hover and becomes `--ud-focus-border` on focus. While it holds a query, a tiny
   tertiary Clear Search button (`Action` size `tiny`, a 24 px square) takes the place of the `/` key.
