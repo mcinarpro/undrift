@@ -28,6 +28,10 @@ pub struct Issue {
     /// RFC 3339 of the moment it was Started from Undrift; `None` otherwise. Undrift's own, set at
     /// build time from `started.json`.
     pub started_at: Option<String>,
+    /// The id of the Session it was Started in; `None` otherwise. Undrift's own, as above.
+    pub session_id: Option<String>,
+    /// RFC 3339 of the moment it was closed on GitHub; `None` for an open Issue.
+    pub closed_at: Option<String>,
 }
 
 /// The `owner/name` an Issue URL belongs to, so a stored URL can be checked against the open
@@ -54,6 +58,8 @@ struct IssueLine {
     /// Missing or `null` on some Issues – Renovate's, for one – which means no blocker.
     #[serde(default)]
     issue_dependencies_summary: Option<Dependencies>,
+    #[serde(default)]
+    closed_at: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -71,6 +77,14 @@ struct Label {
 /// so the caller can keep what it had.
 pub fn list(repo: &str) -> Option<Vec<Issue>> {
     parse(&gh::run(&["api", &format!("repos/{repo}/issues?state=open&per_page={PER_PAGE}")])?)
+}
+
+/// The Issues of `owner/name` closed since `since` (RFC 3339), newest first, for the Board's Done
+/// column. GitHub's `since` filters on the last update, so an Issue closed earlier and touched
+/// since would come too; it is left out here.
+pub fn closed(repo: &str, since: &str) -> Option<Vec<Issue>> {
+    let issues = parse(&gh::run(&["api", &format!("repos/{repo}/issues?state=closed&since={since}&per_page={PER_PAGE}")])?)?;
+    Some(issues.into_iter().filter(|i| i.closed_at.as_deref().is_some_and(|c| c >= since)).collect())
 }
 
 #[derive(Deserialize)]
@@ -106,6 +120,8 @@ fn parse(json: &str) -> Option<Vec<Issue>> {
                 blocked_by: l.issue_dependencies_summary.unwrap_or_default().blocked_by,
                 today_since: None,
                 started_at: None,
+                session_id: None,
+                closed_at: l.closed_at,
             })
             .collect(),
     )
@@ -126,6 +142,15 @@ mod tests {
         assert_eq!(issues[0].updated_at, "2026-11-02T20:26:12Z");
         assert_eq!(issues[0].url, "https://github.com/mcinarpro/undrift/issues/4");
         assert_eq!(issues[0].blocked_by, 2);
+    }
+
+    #[test]
+    fn a_closed_issue_keeps_when_it_closed_and_an_open_one_has_no_such_moment() {
+        let json = r#"[{"number":7,"title":"Move the blog to Astro 6","html_url":"https://github.com/o/r/issues/7","closed_at":"2026-11-01T20:00:00Z"},{"number":8,"title":"Open","html_url":"https://github.com/o/r/issues/8","closed_at":null}]"#;
+        let issues = parse(json).unwrap();
+        assert_eq!(issues[0].closed_at.as_deref(), Some("2026-11-01T20:00:00Z"));
+        assert_eq!(issues[1].closed_at, None);
+        assert_eq!(issues[0].session_id, None);
     }
 
     #[test]

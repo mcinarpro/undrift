@@ -17,9 +17,10 @@ Undrift watches someone's own work, so the bridge is a read-only observer:
 
 - Under `~/.claude` it only reads. Its own state lives in `~/.config/undrift/` and
   `~/.local/share/undrift/`, written atomically (temp file, then rename).
-- From a transcript it keeps usage numbers, the model, and the title and last-prompt lines
-  Claude Code writes for its resume picker. Prompt text, file contents and tool output stay
-  inside the parser and never reach the window or the cache.
+- From a transcript it keeps usage numbers, the model, the title and last-prompt lines Claude
+  Code writes for its resume picker, and the last line of Claude's last reply, cut at 200
+  characters. Prompt text, the rest of a reply, file contents and tool output stay inside the
+  parser and never reach the window or the cache.
 - In a Project folder it runs `git` and `gh` read-only: never `fetch`, never a write. Every
   `gh` call has a timeout. From git it takes numbers, file names, the branch, the subjects of the
   last commit and of the commits not pushed, and the `origin` URL, never file contents.

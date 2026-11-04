@@ -73,6 +73,8 @@ pub struct SessionView {
     pub cwd: String,
     pub title: String,
     pub last_prompt: Option<String>,
+    /// The last line of Claude's last reply: the question it left you on.
+    pub last_reply: Option<String>,
     pub last_activity: String,
 }
 
@@ -107,6 +109,9 @@ pub struct Project {
     pub sessions: Vec<SessionView>,
     /// Open Issues of its GitHub repository; empty without one.
     pub issues: Vec<Issue>,
+    /// The Issues of its GitHub repository closed in the last week, the Board's Done; empty
+    /// without one. Apart, so the pages that count open Issues keep counting them.
+    pub closed: Vec<Issue>,
     /// Whether Home lists it (GLOSSARY.md § Loose End), Let Go already applied.
     pub loose_end: bool,
     /// What every Session reads before its first prompt; `None` when the folder has nothing.
@@ -239,8 +244,13 @@ impl<T: Send + 'static> Background<T> {
 struct GitHubRead {
     repo: String,
     issues: Option<Vec<Issue>>,
+    /// The Issues closed in the last `DONE_DAYS`, for the Board's Done column.
+    closed: Option<Vec<Issue>>,
     description: Option<Option<String>>,
 }
+
+/// How long a closed Issue stays in Done (GLOSSARY.md § Done).
+const DONE_DAYS: i64 = 7;
 
 /// What the bridge knows, from which the Project list is built.
 #[derive(Default)]
@@ -253,6 +263,8 @@ struct Known {
     live: Vec<Session>,
     /// Open Issues by `owner/name`.
     issues: HashMap<String, Vec<Issue>>,
+    /// The Issues closed in the last `DONE_DAYS`, by `owner/name`.
+    closed: HashMap<String, Vec<Issue>>,
     /// Repository descriptions by `owner/name`; `None` for a repository without one.
     descriptions: HashMap<String, Option<String>>,
     let_go: let_go::LetGo,
@@ -310,8 +322,11 @@ impl Known {
                 // longer open matches nothing and is simply not shown, with no write here.
                 for i in &mut issues {
                     i.today_since = today.get(i.url.as_str()).map(|s| (*s).to_owned());
-                    i.started_at = self.started.get(&i.url).cloned();
+                    let start = self.started.get(&i.url);
+                    i.started_at = start.map(|s| s.at.clone());
+                    i.session_id = start.map(|s| s.session.clone());
                 }
+                let closed = read.and_then(|r| r.repo.github.as_ref()).and_then(|g| self.closed.get(g)).cloned().unwrap_or_default();
                 let path_text = path.to_string_lossy().into_owned();
                 let last_session = records.first().map(|r| r.meta.last_activity.as_str());
                 let loose_end = loose_end(read, last_session, last_activity.as_deref(), self.let_go.get(&path_text).map(String::as_str));
@@ -328,6 +343,7 @@ impl Known {
                     open_sessions: open.iter().map(|s| open_view(s)).collect(),
                     sessions: records.iter().take(MAX_SESSIONS).map(|r| view(r.cwd.clone(), &r.meta)).collect(),
                     issues,
+                    closed,
                     loose_end,
                     reads_first: self.reads_first.get(&path).cloned(),
                     path: path_text,
@@ -343,6 +359,7 @@ fn view(cwd: String, m: &SessionMeta) -> SessionView {
         cwd,
         title: m.title.clone(),
         last_prompt: (!m.last_prompt.trim().is_empty()).then(|| m.last_prompt.clone()),
+        last_reply: (!m.last_reply.trim().is_empty()).then(|| m.last_reply.clone()),
         last_activity: m.last_activity.clone(),
     }
 }
@@ -496,7 +513,8 @@ fn run(app: AppHandle, shared: Shared) {
         let repos = github.clone();
         github_scan.run(n % GITHUB_EVERY_TICKS == 0 || github_changed, asked, move || {
             let list: Vec<&String> = repos.iter().collect();
-            let found = in_parallel(&list, GH_WORKERS, |r| GitHubRead { issues: issues::list(r), description: issues::description(r), repo: (*r).clone() });
+            let since = (chrono::Utc::now() - chrono::Duration::days(DONE_DAYS)).to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            let found = in_parallel(&list, GH_WORKERS, |r| GitHubRead { issues: issues::list(r), closed: issues::closed(r, &since), description: issues::description(r), repo: (*r).clone() });
             (repos, found)
         });
         if let Some(((covered, found), was_asked)) = github_scan.poll() {
@@ -506,11 +524,15 @@ fn run(app: AppHandle, shared: Shared) {
                 if let Some(i) = f.issues {
                     known.issues.insert(f.repo.clone(), i);
                 }
+                if let Some(c) = f.closed {
+                    known.closed.insert(f.repo.clone(), c);
+                }
                 if let Some(d) = f.description {
                     known.descriptions.insert(f.repo, d);
                 }
             }
             known.issues.retain(|r, _| github.contains(r));
+            known.closed.retain(|r, _| github.contains(r));
             known.descriptions.retain(|r, _| github.contains(r));
             dirty = true;
             answer |= was_asked;

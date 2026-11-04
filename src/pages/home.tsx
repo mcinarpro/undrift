@@ -2,13 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { m, useMotionValue, type MotionValue } from "motion/react";
 import { Action } from "@/components/action";
 import { Empty, Gauge, GroupDot, Key, ProjectAvatar, STATUS_DOT, StatusMark, useNow } from "@/components/bits";
-import { DriftStrip } from "@/components/drift-strip";
 import { Icon } from "@/components/icon";
 import { Bar, useProjectsRead, useSkeleton } from "@/components/loading";
 import { Note, NoteGhost, SessionCard } from "@/components/note";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cellKey, COLUMNS, columnOf, lanes, MAX_LANES, shelf, upNext, type BoardDrag, type Column, type Dragging, type Grip, type Lane, type Pad, type ShelfItem as ShelfEntry, type Target, type UpNext } from "@/lib/board";
-import { driftCells, elapsed, headline, looseEnds, needsYou, type StatusName } from "@/lib/home";
+import { elapsed, headline, looseEnds, needsYou, type StatusName } from "@/lib/home";
 import { openStatuses } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store";
@@ -22,25 +21,23 @@ import type { Issue, Project } from "@/types";
 // folder dragged onto the Board puts its Project in Focus; a tape dragged onto the Shelf takes it
 // out.
 
-/** The Lane's head, then the three columns: Today is narrow, since it holds a Note or two by
- * design, and Doing wide, since a Card is twice a Note. */
-const LANE_GRID = "grid grid-cols-[216px_1.25fr_0.85fr_1.4fr]";
+/** The Lane's head, then the four columns: Today and Done are narrow, since one holds a Note or
+ * two by design and the other only what has left, and Doing wide, since a Card is twice a Note. */
+const LANE_GRID = "grid grid-cols-[216px_1.2fr_0.8fr_1.3fr_0.75fr]";
 
 /** A cell's padding: room on top for a Card's pin and flag, which stand above its edge. With it a
  * Lane is under 200 px, so four fit a 1080 px window without the Board scrolling. */
 const CELL = "px-3 pt-5 pb-3";
 
-const HEADS: Record<Column, { title: string; hint: string }> = {
-  ready: { title: "Ready", hint: "Nothing blocks them" },
-  today: { title: "Today", hint: "Pulled forward by you" },
-  doing: { title: "Doing", hint: "A Session on it – Start or Resume" },
-};
+const HEADS: Record<Column, string> = { ready: "Ready", today: "Today", doing: "Doing", done: "Done" };
 
-/** What an empty cell says, in the place a Note would take. */
+/** What an empty cell says while a Note it may take is lifted: the verb of the drop. Done takes
+ * no drop, so its Ghost is never drawn. */
 const GHOSTS: Record<Column, string> = {
-  ready: "No Issue ready to Start",
-  today: "Pull a Note here",
-  doing: "Drop a Note here to Start it in a terminal",
+  ready: "Put it back in Ready",
+  today: "Pull it into Today",
+  doing: "Start it in a terminal",
+  done: "",
 };
 
 const SWATCH: Record<Pad, string> = { 1: "bg-pad-1", 2: "bg-pad-2", 3: "bg-pad-3", 4: "bg-pad-4" };
@@ -139,14 +136,13 @@ function Tape({ lane, lifted }: { lane: Lane; lifted?: boolean }) {
 }
 
 /** The Lane's head: its tape – dragged onto the Shelf, it takes the Project out of Focus – with
- * a `⋯` of the same, then the Project's Status, its Drift strip and its Focus Gauge. */
+ * a `⋯` of the same, then the Project's Status and its Focus Gauge. */
 function LaneHead({ lane, now, drag }: { lane: Lane; now: Date; drag: BoardDrag }) {
   const { project, focus } = lane;
   const { setFocus, openProject, newSession } = useStore();
   const ref = useRef<HTMLDivElement>(null);
   const [lifting, setLifting] = useState(false);
   const st = pressing(project, now);
-  const days = project.activeDays.length;
   return (
     <div className={cn("flex flex-col items-start gap-2", CELL)}>
       <div className="flex w-full items-center gap-1">
@@ -189,12 +185,6 @@ function LaneHead({ lane, now, drag }: { lane: Lane; now: Date; drag: BoardDrag 
         </DropdownMenu>
       </div>
       {st && <StatusMark status={st.status} count={st.count} />}
-      <div className="flex w-full flex-col gap-1">
-        <DriftStrip cells={driftCells(project.activeDays, now)} />
-        <span className="type-label-12 text-muted-foreground tabular-nums">
-          {days} active {days === 1 ? "day" : "days"}
-        </span>
-      </div>
       <div className="flex items-center gap-2">
         <Gauge value={focus.active} max={focus.days} size={28} label={`${focus.active} of ${focus.days} days with Activity since ${day(project.focusSince!)}`} />
         <span className="type-label-12 text-muted-foreground tabular-nums">
@@ -228,16 +218,20 @@ function LaneRow({
       <LaneHead lane={lane} now={now} drag={drag} />
       {COLUMNS.map((column) => {
         const key = cellKey({ lane: project.path, column });
-        // Only a Note of this Lane, from another column, can land here: no ring says no.
-        const legal = dragging?.kind === "note" && dragging.lane === project.path && dragging.column !== column;
+        // Only a Note of this Lane, from another column, can land here – never in Done, which
+        // GitHub alone fills: no ring says no. While one is lifted, an empty cell it may land in
+        // holds its Ghost; at rest an empty cell is empty.
+        const legal = column !== "done" && dragging?.kind === "note" && dragging.lane === project.path && dragging.column !== column;
         const issues = lane[column];
         const empty = issues.length === 0 && (column !== "doing" || lane.cards.length === 0);
         // One row, never two: each piece of paper gets a column it may overflow, and the columns
         // shrink together when the cell is short of room, so the pieces overlap like paper on a
         // wall – the last laid down whole, the earlier ones peeking out from under it. The last
-        // column keeps its full width, so the last piece never crosses the cell's edge.
-        const widths = [...(column === "doing" ? lane.cards.map(() => 268) : []), ...(notes === "ready" ? issues.map(() => 136) : [])];
+        // column keeps its full width, so the last piece never crosses the cell's edge. A Card
+        // with its Note under it is a little wider than a Card alone.
+        const widths = [...(column === "doing" ? lane.cards.map((c) => (c.issue ? 300 : 268)) : []), ...(notes === "ready" ? issues.map(() => 136) : [])];
         const template = widths.map((w, i) => (i === widths.length - 1 ? `${w}px` : `minmax(28px, ${w + 12}px)`)).join(" ");
+        const note = (issue: Issue, className?: string) => <Note key={issue.url} project={project} issue={issue} column={column} pad={lane.pad} drag={drag} onMove={(i, from, to) => onMove(project, i, from, to)} className={className} />;
         return (
           <div
             key={column}
@@ -247,14 +241,21 @@ function LaneRow({
             style={{ gridTemplateColumns: template || undefined }}
             className={cn("grid min-h-[188px] content-start justify-start border-l border-border", CELL, legal && over === key && "rounded-lg ring-2 ring-mark")}
           >
-            {column === "doing" && lane.cards.map((card) => <SessionCard key={card.id} project={project} card={card} now={now} />)}
-            {notes === "skeleton" ? (
-              <Bar className="size-[136px] rounded-[2px]" />
-            ) : notes === "ready" && empty ? (
-              <NoteGhost>{GHOSTS[column]}</NoteGhost>
-            ) : (
-              notes === "ready" && issues.map((issue) => <Note key={issue.url} project={project} issue={issue} column={column} pad={lane.pad} drag={drag} onMove={(i, from, to) => onMove(project, i, from, to)} />)
-            )}
+            {column === "doing" &&
+              lane.cards.map((card) =>
+                // The Note a Session was Started from sits under its Card, its corner showing; it
+                // comes out under the pointer. The wrapper's own stacking keeps it behind the Card
+                // and still above the Board.
+                card.issue && notes === "ready" ? (
+                  <div key={card.id} className="relative isolate pr-8 pb-5">
+                    <SessionCard project={project} card={card} now={now} />
+                    {note(card.issue, "absolute right-0 bottom-0 -z-10 hover:z-10 focus-within:z-10")}
+                  </div>
+                ) : (
+                  <SessionCard key={card.id} project={project} card={card} now={now} />
+                ),
+              )}
+            {notes === "skeleton" ? <Bar className="size-[136px] rounded-[2px]" /> : notes === "ready" && empty ? legal && <NoteGhost>{GHOSTS[column]}</NoteGhost> : notes === "ready" && issues.map((issue) => note(issue))}
           </div>
         );
       })}
@@ -387,12 +388,9 @@ function ShelfItem({ item, now, drag }: { item: ShelfEntry; now: Date; drag: Boa
 function Shelf({ items, now, drag, ring }: { items: ShelfEntry[]; now: Date; drag: BoardDrag; ring: boolean }) {
   return (
     <section data-drop="shelf" aria-labelledby="shelf" className="flex min-h-0 flex-col gap-3">
-      <div className="flex shrink-0 flex-col gap-0.5 px-1">
-        <h2 id="shelf" className="type-label-14 font-medium">
-          Shelf <span className="type-label-13 font-normal text-muted-foreground tabular-nums">{items.length}</span>
-        </h2>
-        <p className="type-label-12 text-muted-foreground">The ones that need you first. Drag one onto the Board to work on it.</p>
-      </div>
+      <h2 id="shelf" className="shrink-0 px-1 type-label-14 font-medium">
+        Shelf <span className="type-label-13 font-normal text-muted-foreground tabular-nums">{items.length}</span>
+      </h2>
       <div className={cn("flex min-h-0 flex-col overflow-y-auto rounded-xl p-2 material-small", ring && "ring-2 ring-mark")}>
         {items.map((item) => (
           <ShelfItem key={item.project.path} item={item} now={now} drag={drag} />
@@ -428,17 +426,16 @@ function BoardSkeleton() {
           <div className={LANE_GRID}>
             <div />
             {COLUMNS.map((c) => (
-              <div key={c} className="flex flex-col gap-1.5 border-l border-border px-3 pt-4 pb-2">
+              <div key={c} className="border-l border-border px-3 pt-3.5 pb-2">
                 <Bar className="h-4 w-16" />
-                <Bar className="h-3 w-28" />
               </div>
             ))}
           </div>
           {[0, 1].map((i) => (
             <div key={i} className={cn(LANE_GRID, "border-t border-dashed border-line-strong")}>
-              <div className={cn("flex flex-col gap-3", CELL)}>
+              <div className={cn("flex flex-col gap-2", CELL)}>
                 <Bar className="h-8 w-36" />
-                <Bar className="h-3.5 w-full" />
+                <Bar className="h-7 w-40" />
               </div>
               {COLUMNS.map((c) => (
                 <div key={c} className={cn("border-l border-border", CELL)}>
@@ -537,7 +534,7 @@ export function Home() {
     .join(" · ");
   const next = projects ? upNext(projects, now) : null;
   const items = projects ? shelf(projects, now) : [];
-  const count = (c: Column) => all.reduce((n, l) => n + (c === "ready" ? l.ready.filter((i) => i.blockedBy === 0).length : c === "doing" ? l.doing.length + l.cards.length : l.today.length), 0);
+  const count = (c: Column) => all.reduce((n, l) => n + (c === "ready" ? l.ready.filter((i) => i.blockedBy === 0).length : c === "doing" ? l.doing.length + l.cards.length : l[c].length), 0);
   // A folder may land on the Board while it has room; a tape may land on the Shelf.
   const boardRing = dragging?.kind === "project" && over === "board" && all.length < MAX_LANES;
   const shelfRing = dragging?.kind === "lane" && over === "shelf";
@@ -573,11 +570,8 @@ export function Home() {
                     <div className={LANE_GRID}>
                       <div />
                       {COLUMNS.map((c) => (
-                        <div key={c} className="flex flex-col gap-0.5 border-l border-border px-3 pt-3 pb-1.5">
-                          <span className="type-label-14 font-medium">
-                            {HEADS[c].title} <span className="type-label-13 font-normal text-muted-foreground tabular-nums">{notesPhase === "ready" || c === "doing" ? count(c) : ""}</span>
-                          </span>
-                          <span className="type-label-12 text-muted-foreground">{HEADS[c].hint}</span>
+                        <div key={c} className="border-l border-border px-3 pt-3 pb-1.5 type-label-14 font-medium">
+                          {HEADS[c]} <span className="type-label-13 font-normal text-muted-foreground tabular-nums">{notesPhase === "ready" || c === "doing" ? count(c) : ""}</span>
                         </div>
                       ))}
                     </div>

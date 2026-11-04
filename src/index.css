@@ -150,10 +150,10 @@
     box-shadow: var(--ud-shadow-paper);
 }
 
-/* The Board's ground: a dot every 20 px in the edge colour, fading out towards the Board's sides
-   so the grid never ends on a hard line. */
+/* The Board's ground: a dot every 20 px in alpha-400 – a grain under the paper, not a grid over
+   it – fading out towards the Board's sides so it never ends on a hard line. */
 @utility dotted {
-    background-image: radial-gradient(var(--ud-line-strong) 1px, transparent 1.5px);
+    background-image: radial-gradient(var(--ud-alpha-400) 1px, transparent 1.5px);
     background-size: 20px 20px;
     background-position: 10px 10px;
     mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 90%, transparent);

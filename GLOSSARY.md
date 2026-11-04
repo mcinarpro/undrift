@@ -49,7 +49,7 @@ _Avoid_: Kanban, sprint, dashboard, desk
 
 **Lane**:
 A Project in Focus as a row of the Board: its strip of tape on the left – the Project, its Status,
-its Drift strip, its Focus Gauge – then its Notes in Ready, Today and Doing, and in Doing its Cards.
+its Focus Gauge – then its Notes in Ready, Today and Doing, and in Doing its Cards.
 Its paper is its place: the first Lane's pad is yellow, the second pink, the third green, the
 fourth lavender. Its tape dragged onto the Shelf takes the Project out of Focus.
 _Avoid_: Swimlane, row, timeline
@@ -67,14 +67,21 @@ leaves Today when it closes on GitHub or when it is Started.
 _Avoid_: Queue, plan, backlog, task list
 
 **Doing**:
-The Board's last column: the Project's open Sessions as Cards, and the Notes Started from Undrift,
-which stay there until the Issue closes or Mehmet takes them out.
+The Board's third column: the Project's open Sessions as Cards, each with the Note it was Started
+from under it, and the Notes Started from Undrift whose Session has ended – they can Resume it –
+until the Issue closes or Mehmet takes them out.
 _Avoid_: In progress, WIP
+
+**Done**:
+The Board's last column: the Issues closed on GitHub in the last 7 days, faded, leaving on their
+own. Nothing is dragged into or out of it – closing the Issue on GitHub is what moves a Note there.
+_Avoid_: Finished, archive, history
 
 **Card**:
 A Session in a Lane's Doing cell: a white card pinned by its Status – a black head waits on Mehmet,
-a blue one works, a hollow one has gone quiet – and flagged *Left off* when it is the Session a
-Loose End was left in. An open Session runs in its own window; only an earlier one gets Resume.
+a blue one works, a hollow one has gone quiet – flagged *Left off* when it is the Session a Loose
+End was left in, with the Note it was Started from under its corner. An open Session runs in its
+own window; only an earlier one gets Resume.
 _Avoid_: Pin, tile, note
 
 **Shelf**:
@@ -158,6 +165,6 @@ _Avoid_: Ticket, task, todo, job
 
 **Start**:
 Opening a terminal running Claude Code in a Project with an Issue as its first prompt – from a
-Note, by drag into Doing or by its button, or from the Project page. Undrift remembers the moment,
-so the Note sits in Doing.
+Note, by drag into Doing or by its button, or from the Project page – and a session id Undrift
+chose. Undrift remembers the moment and the id, so the Note sits in Doing, under its Card.
 _Avoid_: Launch, run, kick off, implement

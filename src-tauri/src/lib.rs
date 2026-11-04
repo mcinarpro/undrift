@@ -26,15 +26,16 @@ fn issue(shared: &bridge::Shared, path: &str, number: u32) -> Result<(bridge::Pr
     Ok((project, issue))
 }
 
-/// Takes out of Today and of the Starts every Issue the list knows to be closed: its repository
-/// has open Issues on record and this one is not among them. A repository `gh` could not read has
-/// none on record, so its intentions are kept. Housekeeping after a write Mehmet asked for, so a
-/// failure here is logged and never fails his action.
+/// Takes out of Today and of the Starts every Issue the list knows to be closed: it is among the
+/// Issues closed this week, or its repository has open Issues on record and it is not among them.
+/// A repository `gh` could not read has none on record, so its intentions are kept. Housekeeping
+/// after a write Mehmet asked for, so a failure here is logged and never fails his action.
 fn prune(shared: &bridge::Shared) {
     let projects = shared.lock().ok().and_then(|l| l.projects.clone()).unwrap_or_default();
     let dead = |url: &str| {
         let Some(repo) = bridge::issues::repo_of(url) else { return false };
-        projects.iter().any(|p| p.repo.as_ref().is_some_and(|r| r.github.as_deref() == Some(repo.as_str())) && !p.issues.is_empty() && !p.issues.iter().any(|i| i.url == url))
+        projects.iter().any(|p| p.closed.iter().any(|i| i.url == url))
+            || projects.iter().any(|p| p.repo.as_ref().is_some_and(|r| r.github.as_deref() == Some(repo.as_str())) && !p.issues.is_empty() && !p.issues.iter().any(|i| i.url == url))
     };
     if let Err(e) = bridge::config::prune_today(&dead) {
         eprintln!("today: {e}");
@@ -75,8 +76,10 @@ async fn start(shared: tauri::State<'_, bridge::Shared>, path: String, number: u
     if issue.blocked_by > 0 {
         return Err(format!("#{number} is blocked by an open Issue"));
     }
-    terminal::start(&project.path, &terminal_setting(), number)?;
-    bridge::started::stamp(&issue.url, &chrono::Local::now().to_rfc3339()).map_err(|e| e.to_string())?;
+    // The Session gets an id of Undrift's choosing, the one thing that ties it to the Issue later.
+    let session = uuid::Uuid::new_v4().to_string();
+    terminal::start(&project.path, &terminal_setting(), number, &session)?;
+    bridge::started::stamp(&issue.url, &chrono::Local::now().to_rfc3339(), &session).map_err(|e| e.to_string())?;
     prune(&shared);
     rebuild(&shared);
     Ok(())

@@ -31,14 +31,15 @@ look wrong without their reason are in [docs/adr/](docs/adr/).
 | Source | What is kept |
 | --- | --- |
 | `~/.claude/sessions/<pid>.json` | the open Sessions: id, folder, busy or waiting |
-| `~/.claude/projects/<slug>/<sessionId>.jsonl` | when each turn happened, and the title and last-prompt lines Claude Code writes for its own resume picker – never the prompt text, file contents or tool output |
+| `~/.claude/projects/<slug>/<sessionId>.jsonl` | when each turn happened, the title and last-prompt lines Claude Code writes for its own resume picker, and the last line of Claude's last reply (200 characters at most) – never the prompt text, the rest of a reply, file contents or tool output |
 | `git` in each Project folder (`rev-parse`, `log`, `status`, `diff`, `remote`) | the branch, the last commit, what is changed and what is unpushed, the days with a commit, the `origin` URL |
-| `gh issue list`, `gh repo view`, `gh api user` | the open Issues, the repository's description, the account and its avatar |
+| `gh api repos/…/issues`, `gh repo view`, `gh api user` | the open Issues and the ones closed this week, the repository's description, the account and its avatar |
 
 Projects are discovered: every git root directly under `~/workspace`, plus every folder a Session
 ran in. Undrift's own state lives in `~/.config/undrift/config.json` (roots, Hides, Focus, Today,
 and `terminal`, the terminal to open on Linux – empty takes `$TERMINAL`, then the first one on the
-PATH) and `~/.local/share/undrift/` (the transcript cache, the Let Gos, the Starts, the avatar).
+PATH) and `~/.local/share/undrift/` (the transcript cache, the Let Gos, the Starts – each with the
+session id Undrift handed `claude`, so a Note knows its Session – and the avatar).
 
 ## What it starts
 

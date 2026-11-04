@@ -49,6 +49,7 @@ export function Note({
   pad,
   drag,
   onMove,
+  className,
 }: {
   project: Project;
   issue: Issue;
@@ -57,14 +58,20 @@ export function Note({
   /** The Board's drag; none for a blocked Issue. */
   drag: BoardDrag | null;
   onMove: (issue: Issue, from: Column, to: Column) => void;
+  /** Where the Note sits when it is not in the cell's flow – under its Card. */
+  className?: string;
 }) {
   const start = useStore((s) => s.start);
+  const resume = useStore((s) => s.resume);
   const ref = useRef<HTMLDivElement>(null);
   const [lifting, setLifting] = useState(false);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const reduced = useReducedMotion();
   const blocked = issue.blockedBy > 0;
+  const done = column === "done";
+  // A Doing Note whose Session ended can open it again; one whose Session still runs has its Card.
+  const ended = column === "doing" && !!issue.sessionId && project.sessions.some((s) => s.id === issue.sessionId) && !project.openSessions.some((o) => o.id === issue.sessionId);
 
   // A Note drawn in a new cell starts where its old self was and slides into place.
   useLayoutEffect(() => {
@@ -86,7 +93,7 @@ export function Note({
     remember(issue.url, ref.current);
     onMove(issue, column, to);
   };
-  const draggable = !!drag && !blocked;
+  const draggable = !!drag && !blocked && !done;
 
   return (
     <m.div
@@ -116,15 +123,25 @@ export function Note({
         PAD[blocked ? "off" : pad],
         blocked && "text-ink-2",
         draggable && "cursor-grab",
+        // Closed, the paper fades: it is leaving the Board.
+        done && "opacity-75 saturate-50",
         // Lifted, the Note must not catch the pointer: the cell under it is what the drop reads,
         // and the pointerup must not land on the button the drag began on.
         lifting && "pointer-events-none z-20 cursor-grabbing shadow-(--ud-shadow-paper-lifted) will-change-transform",
+        className,
       )}
     >
       <span className="type-label-12 font-mono text-ink-2 tabular-nums">#{issue.number}</span>
       <span className="line-clamp-3 type-label-14 font-medium">{issue.title}</span>
       <span className="mt-auto flex items-center gap-1">
-        {blocked ? (
+        {done ? (
+          <span className="flex items-center gap-1 type-label-12 text-ink-2 tabular-nums">
+            <svg className="size-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+            Closed {issue.closedAt ? age(issue.closedAt, new Date()) : ""}
+          </span>
+        ) : blocked ? (
           <span className="type-label-12 text-ink-2">waits on {issue.blockedBy === 1 ? "1 Issue" : `${issue.blockedBy} Issues`}</span>
         ) : column === "doing" ? (
           <span className="type-label-12 text-ink-2 tabular-nums">Started {issue.startedAt ? age(issue.startedAt, new Date()) : "just now"}</span>
@@ -154,12 +171,17 @@ export function Note({
                 Take out of Today
               </DropdownMenuItem>
             )}
+            {ended && (
+              <DropdownMenuItem onClick={() => resume(project.path, issue.sessionId!)} className={ITEM}>
+                Resume the Session
+              </DropdownMenuItem>
+            )}
             {column === "doing" && (
               <DropdownMenuItem onClick={() => move(issue.todaySince ? "today" : "ready")} className={ITEM}>
                 Take out of Doing
               </DropdownMenuItem>
             )}
-            {!blocked && column !== "doing" && (
+            {!blocked && !done && column !== "doing" && (
               <DropdownMenuItem onClick={() => void start(project.path, issue.number)} className={ITEM}>
                 Start
               </DropdownMenuItem>
@@ -190,6 +212,9 @@ export function SessionCard({ project, card, now }: { project: Project; card: Ca
     : card.since
       ? `Left ${age(card.since, now)}`
       : null;
+  // The last word said: your prompt while it works, Claude's last line once it has finished or was
+  // left – the question to answer, or the step it stopped at – so the Card says what it needs.
+  const word = card.status === "Busy" ? card.lastPrompt : (card.lastReply ?? card.lastPrompt);
   return (
     <article className="relative flex w-[268px] shrink-0 flex-col gap-2 rounded-[3px] bg-white p-3 pt-4 text-ink shadow-[0_0_0_1px_#0000000d,0_2px_3px_#0000000f,4px_12px_16px_-10px_#00000040] hover:z-10 focus-within:z-10">
       {card.status && (
@@ -209,7 +234,7 @@ export function SessionCard({ project, card, now }: { project: Project; card: Ca
       <div className="flex flex-col gap-1">
         {line && <span className="type-label-12 text-ink-2 tabular-nums">{line}</span>}
         <h3 className="line-clamp-2 type-label-14 font-medium">{card.title ?? "Untitled Session"}</h3>
-        {card.lastPrompt && <p className="line-clamp-1 type-copy-13 text-ink-2">“{card.lastPrompt}”</p>}
+        {word && <p className="line-clamp-2 type-copy-13 text-ink-2">“{word}”</p>}
       </div>
       <div className="mt-1 flex items-center gap-2">
         {card.status === null ? (

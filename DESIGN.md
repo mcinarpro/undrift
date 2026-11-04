@@ -45,37 +45,46 @@ window. A view is described here once it is built; until then this section holds
   page's only primary button, a small Resume or Start. With nothing to pick up it says *Nothing to
   pick up – pull a Note into Today.*
   The **Board** is one `material-small` surface at 16 px with a dot grid on it – 1 px dots every
-  20 px in `line-strong`, fading out at the top and bottom – and inside it a grid of a 200 px head
-  column and three equal columns, Ready, Today, Doing, each named once above the first Lane in
-  `type-label-14` 500 with its count in `muted` and a `type-label-12` hint (*Nothing blocks them*,
-  *Pulled forward by you*, *A Session on it – Start or Resume*). A **Lane** is a row of that grid,
-  its top a dashed `line-strong` line, its cells parted by a solid `line`. The head is a strip of
-  tape – a 32 px `raised` bar with a 12 px swatch of the Lane's pad colour, the 20 px avatar and the
-  name – then the most pressing Status of its open Sessions as on a Loose End card, the Drift strip
-  with its active days, and the 28 px Focus Gauge with *of 9 days · since 1 Nov*. A cell is at least
-  224 px tall, 12 px of padding, its content wrapping with 12 px gaps; a cell under the pointer that
-  a Note of its Lane may land in takes the 2 px `accent` ring, any other cell nothing – no ring is
-  the "no". An empty cell holds a **Ghost**, a dashed 136 px square in `line-strong` with one
-  `type-label-12` sentence: *No Issue ready to Start*, *Pull a Note here*, *Drop a Note here to
-  Start it in a terminal*. With nothing in Focus the Board holds Geist's Empty State – *Nothing in
-  Focus.* – and the whole surface is the drop target.
+  20 px in `alpha-400`, a grain under the paper rather than a grid over it, fading out at the top
+  and bottom – and inside it a grid of a 216 px head column and four columns, Ready, Today, Doing,
+  Done, at 1.2, 0.8, 1.3 and 0.75 of the width left – Today and Done hold little by design, a Card
+  is twice a Note – each named once above the first Lane in `type-label-14` 500 with its count in
+  `muted` and nothing else: the Ghosts say what a column takes. A **Lane** is a row of that grid, its top a
+  dashed `line-strong` line, its cells parted by a solid `line`. The head is a strip of tape – a
+  32 px `raised` bar with a 12 px swatch of the Lane's pad colour, the 20 px avatar and the name –
+  then the most pressing Status of its open Sessions as on a Loose End card, and the 28 px Focus
+  Gauge with *of 9 days · since 1 Nov*, the Lane's one instrument, since Focus is what the Board
+  measures – the Drift strip stays on the Project's page. A cell is at least 224 px tall, 12 px of
+  padding, its content wrapping with 12 px gaps; a cell under the pointer that a Note of its Lane
+  may land in takes the 2 px `accent` ring, any other cell nothing – no ring is the "no". At rest
+  an empty cell is empty; while a Note is lifted, each empty cell of its Lane it may land in holds
+  a **Ghost**, a dashed 136 px square in `line-strong` with the verb of the drop in one
+  `type-label-12` sentence: *Put it back in Ready*, *Pull it into Today*, *Start it in a terminal*.
+  With nothing in Focus the Board holds Geist's Empty State – *Nothing in Focus.* – and the whole
+  surface is the drop target.
   A **Note** is an Issue: a 136 px square of paper (§ Colour, Paper) with a 2 px radius, leaning 1°
   to 3° the way its number says, `#N` in 12 px mono `ink-2` over the title in `type-label-14` 500 on
   three lines; under the pointer or the keyboard its last row shows a tertiary tiny Start and a
-  `⋯` menu – *Pull into Today* or *Take out of Today*, *Start*, *Open on GitHub*; in Doing *Take
-  out of Doing* and the moment it was Started. A blocked Issue is a grey Note in `ink-2` that says
-  *waits on 2 Issues* and offers only *Open on GitHub*. Ready holds the Issues ready to Start, the
+  `⋯` menu – *Pull into Today* or *Take out of Today*, *Start*, *Open on GitHub*; in Doing the
+  moment it was Started, *Resume the Session* when that Session has ended, and *Take out of
+  Doing*. A blocked Issue is a grey Note in `ink-2` that says *waits on 2 Issues* and offers only
+  *Open on GitHub*. A closed one is faded (`opacity-75 saturate-50`), says *✓ Closed yesterday*,
+  cannot be dragged and offers only *Open on GitHub*. Ready holds the Issues ready to Start, the
   most recently updated first, then the blocked ones; Today the Issues pulled, the first pulled
-  first; Doing the Issues Started from Undrift, the first Started first, after the Lane's **Cards**.
+  first; Doing the Lane's **Cards**, each with the Note it was Started from under its bottom-right
+  corner – behind the Card, out under the pointer – then the Started Notes whose Session is gone;
+  Done the Issues closed on GitHub this week, the last closed first, which GitHub alone fills and
+  empties.
   A Card is a Session: a 268 px white card at 3 px with the paper shadow, pinned by a 16 px head at
-  its top – black waits on you, blue works, hollow has gone quiet – and flagged *Left off · last
-  night* in a black 18 px tab at its top right when a Loose End was left in it. It carries the
+  its top left – black waits on you, blue works, hollow has gone quiet – and flagged *Left off ·
+  last night* in a black 18 px tab at its top right when a Loose End was left in it. It carries the
   Status and how long (*Waiting · 7 h · in a terminal*, or *Left 9 h ago*), the title in
-  `type-heading-16` on two lines, the last prompt in `type-copy-13` on two, then a small paper-grey
-  Open Project for an open Session – it runs, so no Resume – or Resume for an earlier one, with a
-  `⋯` of Open Project and Let Go when it is flagged.
-  Beside the Board, 232 px wide, the **Shelf**: a caption – *Shelf · 10* over *The ones that need
-  you first. Drag one onto the Board to work on it, a tape back here to stop.* – then one
+  `type-label-14` 500 on two lines, its last word in `type-copy-13` on two – your last prompt while
+  it is busy, else the last line of Claude's last reply, the question it left you on – then a small
+  paper-grey Open Project for an open Session – it runs, so no Resume – or Resume for an earlier
+  one, with a `⋯` of Open Project and Let Go when it is flagged.
+  Beside the Board, 232 px wide, the **Shelf**: its caption, *Shelf · 10*, with no hint under it –
+  the Board's Empty State says what a drag does – then one
   `material-small` card at 12 px, 8 px of padding, scrolling on its own, of rows parted by the
   edge colour: the 24 px avatar, the name in `type-label-13` 500 over one mark in
   `type-label-12` – *Waiting · 25 min* with the black dot, *Busy* with the blue one, a filled

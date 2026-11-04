@@ -1,6 +1,7 @@
 //! Session history: every session transcript under `~/.claude/projects` written in the last
-//! KEEP_DAYS days gives its folder, the local days it had a turn on, and what Claude Code's
-//! own resume picker shows of it (title, last prompt preview). One record per file is cached
+//! KEEP_DAYS days gives its folder, the local days it had a turn on, what Claude Code's own
+//! resume picker shows of it (title, last prompt preview), and the last line of Claude's last
+//! reply. One record per file is cached
 //! in `~/.local/share/undrift/history.json` keyed by (mtime, size), so a rescan only reads
 //! files that changed. Records carry the session's folder; which Project it belongs to is
 //! decided later, so a new Hide needs no re-parse.
@@ -25,6 +26,8 @@ pub struct SessionMeta {
     pub title: String,
     /// The preview Claude Code keeps for its own resume picker, already cut short by it.
     pub last_prompt: String,
+    /// The last line of Claude's last reply: the question it left you on, or the step it stopped at.
+    pub last_reply: String,
     /// RFC 3339 of the last prompt or reply.
     pub last_activity: String,
 }
@@ -48,7 +51,7 @@ pub struct Record {
 }
 
 /// Bump when the record shape changes: an older cache is ignored and rebuilt.
-const CACHE_VERSION: u32 = 1;
+const CACHE_VERSION: u32 = 2;
 
 #[derive(Serialize, Deserialize, Default)]
 struct Cache {
@@ -119,7 +122,13 @@ fn parse(path: &Path) -> Option<Record> {
             }
         }
         let ts = match parse_line(&line) {
-            Some(Parsed::Prompt { ts } | Parsed::Reply { ts }) => ts,
+            Some(Parsed::Prompt { ts }) => ts,
+            Some(Parsed::Reply { ts, last_line }) => {
+                if let Some(l) = last_line {
+                    meta.last_reply = l;
+                }
+                ts
+            }
             None => continue,
         };
         if let Some(day) = local_day(&ts) {

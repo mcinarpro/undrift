@@ -8,6 +8,8 @@ export type Session = {
   cwd: string;
   title: string;
   lastPrompt: string | null;
+  /** The last line of Claude's last reply: the question it left you on, or the step it stopped at. */
+  lastReply: string | null;
   /** ISO timestamp of the Session's last turn. */
   lastActivity: string;
 };
@@ -76,6 +78,10 @@ export type Issue = {
   todaySince: string | null;
   /** ISO timestamp of the moment it was Started from Undrift; null otherwise. Undrift's own. */
   startedAt: string | null;
+  /** The id of the Session it was Started in; null otherwise. Undrift's own. */
+  sessionId: string | null;
+  /** ISO timestamp of the moment it was closed on GitHub; null for an open Issue. */
+  closedAt: string | null;
 };
 
 /** Reads First: the size of what a Session loads at start, and the files counted. */
@@ -104,6 +110,8 @@ export type Project = {
   sessions: Session[];
   /** Open Issues; empty when the Project has no GitHub remote. */
   issues: Issue[];
+  /** The Issues closed in the last week, the Board's Done; empty without a GitHub remote. */
+  closed: Issue[];
   /** Whether Home lists it as a Loose End, Let Go already applied. */
   looseEnd: boolean;
   /** What every Session reads before its first prompt; null when the folder has nothing. */

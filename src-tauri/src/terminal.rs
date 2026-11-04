@@ -23,8 +23,10 @@ pub fn new_session(cwd: &str, terminal: &str) -> Result<(), String> {
     open(cwd, terminal, &[])
 }
 
-pub fn start(cwd: &str, terminal: &str, issue: u32) -> Result<(), String> {
-    open(cwd, terminal, &[&start_prompt(issue)])
+/// Start hands `claude` the session id Undrift chose, so the Session can be told apart later – the
+/// Note it began from sits under its Card – without reading a word of the transcript.
+pub fn start(cwd: &str, terminal: &str, issue: u32, session_id: &str) -> Result<(), String> {
+    open(cwd, terminal, &["--session-id", session_id, &start_prompt(issue)])
 }
 
 #[cfg(target_os = "linux")]

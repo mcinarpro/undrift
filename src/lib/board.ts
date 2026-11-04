@@ -6,8 +6,8 @@ import type { Issue, Project, Session } from "@/types";
 // bridge's Projects on the window's own clock – a Lane per Project in Focus, three columns a Note
 // moves through, the other Projects on the Shelf, and Up Next above it all.
 
-export type Column = "ready" | "today" | "doing";
-export const COLUMNS: Column[] = ["ready", "today", "doing"];
+export type Column = "ready" | "today" | "doing" | "done";
+export const COLUMNS: Column[] = ["ready", "today", "doing", "done"];
 
 /** One column of one Lane, the Lane named by its Project's path. */
 export type Cell = { lane: string; column: Column };
@@ -39,8 +39,9 @@ const time = (iso: string) => new Date(iso).getTime();
 /** A moment to sort by, a missing one last. */
 const at = (iso: string | null) => (iso ? time(iso) : Number.MAX_SAFE_INTEGER);
 
-/** Where a Note sits: in flight where it was just dropped, else Doing once Started, Today once
- * pulled, Ready otherwise – a blocked Issue stays in Ready, greyed. */
+/** Where an open Note sits: in flight where it was just dropped, else Doing once Started, Today
+ * once pulled, Ready otherwise – a blocked Issue stays in Ready, greyed. A closed Issue never comes
+ * through here: it is in `project.closed`, and Done is its column. */
 export function columnOf(issue: Issue, flight?: Record<string, Column>): Column {
   return flight?.[issue.url] ?? (issue.startedAt ? "doing" : issue.todaySince ? "today" : "ready");
 }
@@ -52,6 +53,7 @@ export type Card = {
   /** From the transcript; null for an open Session that has not written one yet. */
   title: string | null;
   lastPrompt: string | null;
+  lastReply: string | null;
   lastActivity: string | null;
   /** How long it has been in its Status, or since it was left. */
   since: string | null;
@@ -61,6 +63,8 @@ export type Card = {
   where: string | null;
   /** The section the Loose End was left in; null when the Session left nothing behind. */
   leftOff: Section | null;
+  /** The Issue the Session was Started from, drawn under the Card; null when it began otherwise. */
+  issue: Issue | null;
 };
 
 export type Lane = {
@@ -71,16 +75,20 @@ export type Lane = {
   ready: Issue[];
   /** The Issues pulled into Today, the first pulled first. */
   today: Issue[];
-  /** The Issues Started from Undrift, the first Started first. */
+  /** The Issues Started from Undrift whose Session has no Card – it is not open and left no
+   * Loose End – the first Started first. */
   doing: Issue[];
+  /** The Issues closed on GitHub this week, the last closed first. */
+  done: Issue[];
   /** The open Sessions, the ones waiting on you first, then the Loose End's earlier Session. */
   cards: Card[];
 };
 
 const STATUS_RANK: Record<StatusName, number> = { Waiting: 0, Busy: 1, Quiet: 2 };
 
-function cardsOf(project: Project, now: Date): Card[] {
+function cardsOf(project: Project, now: Date, started: Issue[]): Card[] {
   const left = project.looseEnd ? (project.sessions[0] ?? null) : null;
+  const issueOf = (id: string) => started.find((i) => i.sessionId === id) ?? null;
   const cards: Card[] = project.openSessions
     .map((open) => {
       const session = project.sessions.find((s) => s.id === open.id);
@@ -88,11 +96,13 @@ function cardsOf(project: Project, now: Date): Card[] {
         id: open.id,
         title: session?.title ?? null,
         lastPrompt: session?.lastPrompt ?? null,
+        lastReply: session?.lastReply ?? null,
         lastActivity: session?.lastActivity ?? null,
         since: open.statusSince,
         status: status(open, now),
         where: open.entrypoint === "cli" ? "in a terminal" : "on the desktop",
         leftOff: left && left.id === open.id ? section(left.lastActivity, now) : null,
+        issue: issueOf(open.id),
       };
     })
     .sort((a, b) => STATUS_RANK[a.status!] - STATUS_RANK[b.status!] || at(a.since) - at(b.since));
@@ -101,11 +111,13 @@ function cardsOf(project: Project, now: Date): Card[] {
       id: left.id,
       title: left.title,
       lastPrompt: left.lastPrompt,
+      lastReply: left.lastReply,
       lastActivity: left.lastActivity,
       since: left.lastActivity,
       status: null,
       where: null,
       leftOff: section(left.lastActivity, now),
+      issue: issueOf(left.id),
     });
   }
   return cards;
@@ -120,14 +132,18 @@ export function lanes(projects: Project[], now: Date, flight?: Record<string, Co
     const { project } = focus;
     const issues = project.issues.filter((issue) => !seen.has(issue.url) && seen.add(issue.url));
     const column = (c: Column) => issues.filter((issue) => columnOf(issue, flight) === c);
+    // A Started Issue sits under the Card of its Session when that Session is on the Board.
+    const started = column("doing").sort((a, b) => at(a.startedAt) - at(b.startedAt));
+    const cards = cardsOf(project, now, started);
     return {
       project,
       pad: ((i % MAX_LANES) + 1) as Pad,
       focus,
       ready: column("ready").sort((a, b) => Number(a.blockedBy > 0) - Number(b.blockedBy > 0) || newest(a, b)),
       today: column("today").sort((a, b) => at(a.todaySince) - at(b.todaySince)),
-      doing: column("doing").sort((a, b) => at(a.startedAt) - at(b.startedAt)),
-      cards: cardsOf(project, now),
+      doing: started.filter((issue) => !cards.some((c) => c.issue === issue)),
+      done: [...project.closed].sort((a, b) => at(b.closedAt) - at(a.closedAt)),
+      cards,
     };
   });
 }
