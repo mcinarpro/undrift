@@ -33,6 +33,13 @@
     --color-error-fill: var(--ud-error-fill);
     --color-error-line: var(--ud-error-line);
     --color-error-bg: var(--ud-error-bg);
+    --color-pad-1: var(--ud-pad-1);
+    --color-pad-2: var(--ud-pad-2);
+    --color-pad-3: var(--ud-pad-3);
+    --color-pad-4: var(--ud-pad-4);
+    --color-pad-off: var(--ud-pad-off);
+    --color-ink: var(--ud-ink);
+    --color-ink-2: var(--ud-ink-2);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -129,6 +136,27 @@
 @utility material-small {
     background-color: var(--ud-surface);
     box-shadow: var(--ud-shadow-small);
+}
+
+/* A Note's paper (DESIGN.md § Components): the pad colour the caller sets in --pad, a darker band
+   on top where the sheet was torn off the block, a faint noise so the flat colour reads as paper,
+   and a drop that lifts it off the Board. */
+@utility paper {
+    background-color: var(--pad, var(--ud-pad-1));
+    background-image:
+        linear-gradient(to bottom, #00000018 0, #0000000a 16px, transparent 22px),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    color: var(--ud-ink);
+    box-shadow: var(--ud-shadow-paper);
+}
+
+/* The Board's ground: a dot every 20 px in the edge colour, fading out towards the Board's sides
+   so the grid never ends on a hard line. */
+@utility dotted {
+    background-image: radial-gradient(var(--ud-line-strong) 1px, transparent 1.5px);
+    background-size: 20px 20px;
+    background-position: 10px 10px;
+    mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 90%, transparent);
 }
 
 /* Geist's named type styles (vercel.com/geist/typography), with the values of vercel.com's own

@@ -11,6 +11,7 @@ pub mod let_go;
 pub mod reads_first;
 pub mod repo;
 pub mod sessions;
+pub mod started;
 pub mod transcripts;
 pub mod user;
 
@@ -174,7 +175,8 @@ pub struct Latest {
     pub read: Read,
     /// Set by the `rescan` command; the next tick rescans everything.
     pub rescan: bool,
-    /// Set by the `let_go` command; the next tick rereads the Let Gos and sends the list again.
+    /// Set by the `let_go`, `start` and `forget_start` commands; the next tick rereads the Let Gos
+    /// and the Starts and sends the list again.
     pub rebuild: bool,
 }
 pub type Shared = Arc<Mutex<Latest>>;
@@ -254,6 +256,8 @@ struct Known {
     /// Repository descriptions by `owner/name`; `None` for a repository without one.
     descriptions: HashMap<String, Option<String>>,
     let_go: let_go::LetGo,
+    /// The Issues Started from Undrift, which the Board's Doing column shows.
+    started: started::Started,
 }
 
 impl Known {
@@ -276,6 +280,7 @@ impl Known {
 
     fn build(&self, config: &Config) -> Vec<Project> {
         let focus: BTreeMap<PathBuf, &str> = config.focus.iter().map(|f| (config::expand(&f.path), f.since.as_str())).collect();
+        let today: BTreeMap<&str, &str> = config.today.iter().map(|t| (t.url.as_str(), t.since.as_str())).collect();
         let first_day = (Local::now().date_naive() - chrono::Duration::days(WINDOW_DAYS - 1)).to_string();
         let mut by_path: BTreeMap<PathBuf, (BTreeSet<String>, Vec<&Record>, Vec<&Session>)> =
             self.paths(config).into_iter().map(|p| (p, Default::default())).collect();
@@ -300,7 +305,13 @@ impl Known {
                 records.sort_by(|a, b| b.meta.last_activity.cmp(&a.meta.last_activity));
                 let last_commit = read.and_then(|r| r.last_commit_at.as_deref());
                 let last_activity = latest(last_commit.into_iter().chain(records.first().map(|r| r.meta.last_activity.as_str())));
-                let issues = read.and_then(|r| r.repo.github.as_ref()).and_then(|g| self.issues.get(g)).cloned().unwrap_or_default();
+                let mut issues = read.and_then(|r| r.repo.github.as_ref()).and_then(|g| self.issues.get(g)).cloned().unwrap_or_default();
+                // Today and the Starts are Undrift's own, kept by URL: an entry whose Issue is no
+                // longer open matches nothing and is simply not shown, with no write here.
+                for i in &mut issues {
+                    i.today_since = today.get(i.url.as_str()).map(|s| (*s).to_owned());
+                    i.started_at = self.started.get(&i.url).cloned();
+                }
                 let path_text = path.to_string_lossy().into_owned();
                 let last_session = records.first().map(|r| r.meta.last_activity.as_str());
                 let loose_end = loose_end(read, last_session, last_activity.as_deref(), self.let_go.get(&path_text).map(String::as_str));
@@ -399,7 +410,7 @@ pub fn start(app: AppHandle) {
 
 fn run(app: AppHandle, shared: Shared) {
     let mut settings = Settings::new();
-    let mut known = Known { discovered: config::discover(settings.config()), let_go: let_go::read(), ..Default::default() };
+    let mut known = Known { discovered: config::discover(settings.config()), let_go: let_go::read(), started: started::read(), ..Default::default() };
     let mut history_scan: Background<Vec<Record>> = Background::new();
     // Each pass hands back what it was asked to read, so a pass that started before a folder or a
     // repository was known never counts for it.
@@ -423,6 +434,7 @@ fn run(app: AppHandle, shared: Shared) {
         let (asked, rebuild) = shared.lock().map(|mut l| (std::mem::take(&mut l.rescan), std::mem::take(&mut l.rebuild))).unwrap_or_default();
         if rebuild {
             known.let_go = let_go::read();
+            known.started = started::read();
         }
         let mut dirty = live_changed || config_changed || rebuild;
         let mut answer = false;

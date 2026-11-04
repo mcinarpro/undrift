@@ -1,6 +1,7 @@
 //! Which folders are Projects (GLOSSARY.md § Discovery): every git checkout directly under a
 //! root (`~/workspace` by default), plus every folder a Session ran in that is not inside one.
-//! Hides take Projects out; Focus is read here and written by `set_focus`, from the Project page.
+//! Hides take Projects out; Focus is read here and written by `set_focus`, from the Project page;
+//! Today (GLOSSARY.md § Today) the same way, by `set_today`, from the Board.
 //! The settings live in `~/.config/undrift/config.json`, reloaded when the file's mtime changes.
 
 use serde::Deserialize;
@@ -9,8 +10,9 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-/// How many Projects Focus holds (GLOSSARY.md § Focus): one to three, so it stays a choice.
-pub const MAX_FOCUS: usize = 3;
+/// How many Projects Focus holds (GLOSSARY.md § Focus): one to four – a Lane each on the Board,
+/// which is as many as a window shows at once – so it stays a choice.
+pub const MAX_FOCUS: usize = 4;
 
 #[derive(Deserialize, Clone, PartialEq, Debug)]
 #[serde(default, rename_all = "camelCase")]
@@ -21,6 +23,8 @@ pub struct Config {
     pub hides: Vec<String>,
     /// The Projects Mehmet chose to push, in the order he placed them.
     pub focus: Vec<Focus>,
+    /// The Issues Mehmet pulled into Today, in the order he pulled them.
+    pub today: Vec<Today>,
     /// The terminal Resume, New Session and Start open; empty takes `$TERMINAL`, then the first
     /// one found on the PATH. Linux only – Windows opens Windows Terminal.
     pub terminal: String,
@@ -28,7 +32,7 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        Config { roots: vec!["~/workspace".into()], hides: Vec::new(), focus: Vec::new(), terminal: String::new() }
+        Config { roots: vec!["~/workspace".into()], hides: Vec::new(), focus: Vec::new(), today: Vec::new(), terminal: String::new() }
     }
 }
 
@@ -39,6 +43,16 @@ pub struct Focus {
     /// Absolute path of the Project.
     pub path: String,
     /// RFC 3339 of the moment it was put in Focus.
+    pub since: String,
+}
+
+/// An Issue pulled into Today (GLOSSARY.md § Today), by its URL: the same for two checkouts of one
+/// repository, and the same on another machine, which a number alone would not be.
+#[derive(Deserialize, Clone, PartialEq, Debug, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Today {
+    pub url: String,
+    /// RFC 3339 of the moment it was pulled.
     pub since: String,
 }
 
@@ -92,6 +106,54 @@ fn set_focus_in(file: &Path, project: &Path, since: Option<&str>) -> std::io::Re
     }
     root.insert("focus".into(), Value::Array(focus));
     super::write_atomic(file, &serde_json::to_vec_pretty(&root)?)
+}
+
+/// Pulls the Issue into Today at `since`, or takes it out with `None` (GLOSSARY.md § Today). The
+/// bridge sees the file's new mtime on its next tick, as for Focus.
+pub fn set_today(url: &str, since: Option<&str>) -> std::io::Result<()> {
+    set_today_in(&path(), url, since)
+}
+
+/// Edited as plain JSON like `set_focus_in`, so the other keys survive. An Issue already in keeps
+/// the moment it was pulled; the array's order is the order of pulling, so a new one goes last.
+fn set_today_in(file: &Path, url: &str, since: Option<&str>) -> std::io::Result<()> {
+    let mut root: Map<String, Value> = read_root(file);
+    let mut today = today_of(&mut root);
+    let at = today.iter().position(|t| t.get("url").and_then(Value::as_str) == Some(url));
+    match (since, at) {
+        (Some(_), Some(_)) | (None, None) => return Ok(()),
+        (Some(since), None) => today.push(json!({ "url": url, "since": since })),
+        (None, Some(i)) => {
+            today.remove(i);
+        }
+    }
+    root.insert("today".into(), Value::Array(today));
+    super::write_atomic(file, &serde_json::to_vec_pretty(&root)?)
+}
+
+/// Takes out of Today every Issue `dead` says is no longer open, writing only when one was. The
+/// bridge never writes at build time, so this runs after a write Mehmet asked for.
+pub fn prune_today(dead: impl Fn(&str) -> bool) -> std::io::Result<()> {
+    prune_today_in(&path(), dead)
+}
+
+fn prune_today_in(file: &Path, dead: impl Fn(&str) -> bool) -> std::io::Result<()> {
+    let mut root: Map<String, Value> = read_root(file);
+    let today = today_of(&mut root);
+    let kept: Vec<Value> = today.iter().filter(|t| !t.get("url").and_then(Value::as_str).is_some_and(&dead)).cloned().collect();
+    if kept.len() == today.len() {
+        return Ok(());
+    }
+    root.insert("today".into(), Value::Array(kept));
+    super::write_atomic(file, &serde_json::to_vec_pretty(&root)?)
+}
+
+/// The `today` array taken out of the file's JSON, empty when missing or not an array.
+fn today_of(root: &mut Map<String, Value>) -> Vec<Value> {
+    match root.remove("today") {
+        Some(Value::Array(today)) => today,
+        _ => Vec::new(),
+    }
 }
 
 /// The file as plain JSON; a missing or broken file is the defaults, as `reload_if_changed`
@@ -216,15 +278,54 @@ mod tests {
         assert_eq!(root["terminal"], "");
     }
 
+    fn today_of_file(file: &Path) -> Vec<(String, String)> {
+        let root: Value = serde_json::from_str(&std::fs::read_to_string(file).unwrap()).unwrap();
+        root["today"].as_array().unwrap().iter().map(|t| (t["url"].as_str().unwrap().to_owned(), t["since"].as_str().unwrap().to_owned())).collect()
+    }
+
     #[test]
-    fn focus_holds_three_projects_at_most() {
+    fn today_is_pulled_kept_and_taken_out_by_url() {
+        let file = temp("today");
+        let a = "https://github.com/mcinarpro/undrift/issues/22";
+        let b = "https://github.com/mcinarpro/undrift/issues/19";
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(&file, json!({ "terminal": "ghostty", "focus": [{ "path": "~/workspace/undrift", "since": "2026-11-01T06:00:00+01:00" }] }).to_string()).unwrap();
+        set_today_in(&file, a, Some("2026-11-04T06:00:00+01:00")).unwrap();
+        set_today_in(&file, b, Some("2026-11-04T06:05:00+01:00")).unwrap();
+        set_today_in(&file, a, Some("2026-11-04T07:00:00+01:00")).unwrap();
+        assert_eq!(today_of_file(&file), vec![(a.into(), "2026-11-04T06:00:00+01:00".into()), (b.into(), "2026-11-04T06:05:00+01:00".into())]);
+        set_today_in(&file, a, None).unwrap();
+        assert_eq!(today_of_file(&file), vec![(b.into(), "2026-11-04T06:05:00+01:00".into())]);
+        let root: Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+        assert_eq!(root["terminal"], "ghostty");
+        assert_eq!(root["focus"].as_array().unwrap().len(), 1);
+        let config: Config = serde_json::from_value(root).unwrap();
+        assert_eq!(config.today, vec![Today { url: b.into(), since: "2026-11-04T06:05:00+01:00".into() }]);
+    }
+
+    #[test]
+    fn pruning_today_drops_only_the_dead_and_writes_only_then() {
+        let file = temp("today-prune");
+        let a = "https://github.com/mcinarpro/undrift/issues/22";
+        let b = "https://github.com/mcinarpro/undrift/issues/19";
+        set_today_in(&file, a, Some("2026-11-04T06:00:00+01:00")).unwrap();
+        set_today_in(&file, b, Some("2026-11-04T06:05:00+01:00")).unwrap();
+        let before = std::fs::metadata(&file).unwrap().modified().unwrap();
+        prune_today_in(&file, |_| false).unwrap();
+        assert_eq!(std::fs::metadata(&file).unwrap().modified().unwrap(), before);
+        prune_today_in(&file, |url| url == a).unwrap();
+        assert_eq!(today_of_file(&file), vec![(b.into(), "2026-11-04T06:05:00+01:00".into())]);
+    }
+
+    #[test]
+    fn focus_holds_four_projects_at_most() {
         let file = temp("focus-max");
         let home = dirs::home_dir().unwrap();
-        for name in ["a", "b", "c"] {
+        for name in ["a", "b", "c", "d"] {
             set_focus_in(&file, &home.join(name), Some("2026-11-03T06:00:00+01:00")).unwrap();
         }
-        assert!(set_focus_in(&file, &home.join("d"), Some("2026-11-03T06:00:00+01:00")).is_err());
-        assert_eq!(focus_of(&file).len(), 3);
+        assert!(set_focus_in(&file, &home.join("e"), Some("2026-11-03T06:00:00+01:00")).is_err());
+        assert_eq!(focus_of(&file).len(), MAX_FOCUS);
     }
 
     #[test]

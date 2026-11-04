@@ -15,7 +15,8 @@ Projects out of it.
 _Avoid_: Import, scan settings
 
 **Focus**:
-The one to three Projects Mehmet chose to push, each with the moment he chose it, on its page.
+The one to four Projects Mehmet chose to push, each with the moment he chose it – on its page, or
+by dragging it onto the Board.
 Undrift measures the Drift from that intention: the days since choosing, and how many of them had
 Activity.
 _Avoid_: Pin, favourite, star, active
@@ -25,20 +26,66 @@ A Project left out of every view. Exact path, never a pattern.
 _Avoid_: Ignore, archive
 
 **Let Go**:
-Taking one Loose End off Home until the Project's next Activity, for work Mehmet chose not to
-finish. The Project stays everywhere else.
+Taking one Loose End off the Board – its flag, its Up Next, its *Left off* on the Shelf – until the
+Project's next Activity, for work Mehmet chose not to finish. The Project stays everywhere else.
 _Avoid_: Dismiss, snooze, ignore, archive
 
 **Home**:
-The first page Undrift opens on: the Loose Ends, newest first, and beside them, on a wide window,
-Needs You over the Issues ready to Start – on a narrower one the Issues come under the Loose Ends.
-Nothing else competes with them.
-_Avoid_: Overview, dashboard, inbox
+The first page Undrift opens on: Up Next, then the Board, then the Shelf. Nothing else competes
+with them.
+_Avoid_: Overview, dashboard, inbox, Kanban
+
+**Up Next**:
+The one thing to pick up, named in a line above the Board, and what Enter does on Home: the newest
+Loose End whose Session is not open, to Resume; else the first Note pulled into Today, to Start;
+else the first Note ready on the Project in Focus that drifted most. A Session still open runs in
+its own window, so it is never Up Next – the greeting names the one that has waited on Mehmet longest.
+_Avoid_: Next action, suggestion, recommendation
+
+**Board**:
+Home's stage: a Lane per Project in Focus, and three columns a Note moves through – Ready, Today,
+Doing. One white surface with a dot grid, the paper on it.
+_Avoid_: Kanban, sprint, dashboard, desk
+
+**Lane**:
+A Project in Focus as a row of the Board: its strip of tape on the left – the Project, its Status,
+its Drift strip, its Focus Gauge – then its Notes in Ready, Today and Doing, and in Doing its Cards.
+Its paper is its place: the first Lane's pad is yellow, the second pink, the third green, the
+fourth lavender. Its tape dragged onto the Shelf takes the Project out of Focus.
+_Avoid_: Swimlane, row, timeline
+
+**Note**:
+An Issue on the Board, a square of paper torn from its Lane's pad, leaning the way its number
+says. It moves forward by drag or by its `⋯` menu: into Today to plan it, into Doing to Start it.
+A blocked Issue is a grey Note that says what it waits on and cannot be moved.
+_Avoid_: Post-it, sticky, card, ticket
+
+**Today**:
+The Issues Mehmet pulled forward, each with the moment he pulled it – Undrift's second intention
+after Focus, kept in `config.json` by URL. A selection of GitHub Issues, never a text: an Issue
+leaves Today when it closes on GitHub or when it is Started.
+_Avoid_: Queue, plan, backlog, task list
+
+**Doing**:
+The Board's last column: the Project's open Sessions as Cards, and the Notes Started from Undrift,
+which stay there until the Issue closes or Mehmet takes them out.
+_Avoid_: In progress, WIP
+
+**Card**:
+A Session in a Lane's Doing cell: a white card pinned by its Status – a black head waits on Mehmet,
+a blue one works, a hollow one has gone quiet – and flagged *Left off* when it is the Session a
+Loose End was left in. An open Session runs in its own window; only an earlier one gets Resume.
+_Avoid_: Pin, tile, note
+
+**Shelf**:
+Every Project not in Focus, one line each under the Board, the ones that need Mehmet first: a
+Session waiting on him, a busy one, a Loose End, then In motion, Drifting, Parked. Dragged onto the
+Board, a Project goes into Focus.
+_Avoid_: Sidebar, list, backlog
 
 **Needs You**:
-The open Sessions across every Project that Home lists beside the Loose Ends: those waiting on
-Mehmet, then those busy, then those gone quiet in the last day – one left overnight is quiet by
-the morning. It lists them; the Sessions Open figure only counts them.
+The open Sessions waiting on Mehmet. The greeting names the one that has waited longest; a Card's
+black head and a Shelf item's *Waiting* mark the others.
 _Avoid_: Inbox, notifications, attention, alerts
 
 **Loose End**:
@@ -51,11 +98,6 @@ _Avoid_: Unfinished, pending, WIP, dirty repo
 The Projects drawn as a network: one hub, a node per Project tied to it, a dot per Session tied
 to its Project.
 _Avoid_: Map, scene, Office
-
-**Lanes**:
-The Projects drawn in time: a row per Project, its days with Activity across 30 days, and the
-Sessions open Now.
-_Avoid_: Timeline, list
 
 **Session**:
 One Claude Code conversation in a Project, identified by its session id. It is either open
@@ -115,5 +157,7 @@ Project page without Start. Undrift reads Issues and never writes them.
 _Avoid_: Ticket, task, todo, job
 
 **Start**:
-Opening a terminal running Claude Code in a Project with an Issue as its first prompt.
+Opening a terminal running Claude Code in a Project with an Issue as its first prompt – from a
+Note, by drag into Doing or by its button, or from the Project page. Undrift remembers the moment,
+so the Note sits in Doing.
 _Avoid_: Launch, run, kick off, implement

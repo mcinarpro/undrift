@@ -1,564 +1,598 @@
-import { useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { m, useMotionValue, type MotionValue } from "motion/react";
 import { Action } from "@/components/action";
-import { Activity, DEFAULT_BRANCHES, Diff, Empty, Gauge, Hint, LIVE_BADGE, ProjectAvatar, STATUS_DOT, useNow, When } from "@/components/bits";
+import { Empty, Gauge, GroupDot, Key, ProjectAvatar, STATUS_DOT, StatusMark, useNow } from "@/components/bits";
+import { DriftStrip } from "@/components/drift-strip";
 import { Icon } from "@/components/icon";
 import { Bar, useProjectsRead, useSkeleton } from "@/components/loading";
+import { Note, NoteGhost, SessionCard } from "@/components/note";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { fileLines, focusRows, headline, issuesByProject, looseEnds, needsYou, status, touchedLast, type FocusPart, type LooseEnd, type NeedRow, type Section as SectionName } from "@/lib/home";
+import { cellKey, COLUMNS, columnOf, lanes, MAX_LANES, shelf, upNext, type BoardDrag, type Column, type Dragging, type Grip, type Lane, type Pad, type ShelfItem as ShelfEntry, type Target, type UpNext } from "@/lib/board";
+import { driftCells, elapsed, headline, looseEnds, needsYou, type StatusName } from "@/lib/home";
+import { openStatuses } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store";
 import type { Issue, Project } from "@/types";
 
-// Home (ADR 0001, DESIGN.md § Layout): the Loose Ends by age as a grid of cards, each led by what
-// the Session was doing, then the Issues ready to Start, a card per Project. The grid fills the
-// full width, where rows left a hole between their parts. From a 1280 px window the Issues move to a
-// column on the right, under the Sessions that need you, so what to Start is on the first screen.
+// Home is the Board (ADR 0004, DESIGN.md § Layout): one line that names the thing to pick up, then
+// a Lane per Project in Focus with its Issues as Notes in three columns – Ready, Today, Doing – and
+// the other Projects on the Shelf beside it. The Board and the Shelf take the window's height and
+// scroll on their own, so the Board stays a board. A Note moves forward by drag or by its menu; the
+// bridge's next list confirms the move, and until then the Note is kept where it was dropped. A
+// folder dragged onto the Board puts its Project in Focus; a tape dragged onto the Shelf takes it
+// out.
 
-// Two columns, three from a 1536 px window: a fourth left most sections with a hole on the right,
-// and the prompts need the width to read.
-const GRID = "grid grid-cols-2 gap-4 2xl:grid-cols-3";
-// Geist's material at 12 px, the radius of DESIGN.md's Panels: at 6 px the grid read as boxes.
-// The card is a group, so what it holds can answer the pointer over the card as a whole.
-const TILE = "group/card flex min-w-0 flex-col gap-3 rounded-xl p-4 material-small";
+/** The Lane's head, then the three columns: Today is narrow, since it holds a Note or two by
+ * design, and Doing wide, since a Card is twice a Note. */
+const LANE_GRID = "grid grid-cols-[216px_1.25fr_0.85fr_1.4fr]";
 
-// Rows inside one card are separated by the edge colour on their top side.
-const ROW = "items-center gap-6 px-4 py-3 not-first:shadow-[0_-1px_0_0_var(--ud-line)]";
+/** A cell's padding: room on top for a Card's pin and flag, which stand above its edge. With it a
+ * Lane is under 200 px, so four fit a 1080 px window without the Board scrolling. */
+const CELL = "px-3 pt-5 pb-3";
 
-/** A Project's name that opens its page, as a link reads: underlined under the pointer. A card
- * keeps its own buttons, so the name is the way in rather than the whole card. */
-function ProjectLink({ project, as: Tag = "span" }: { project: Project; as?: "span" | "h3" }) {
+const HEADS: Record<Column, { title: string; hint: string }> = {
+  ready: { title: "Ready", hint: "Nothing blocks them" },
+  today: { title: "Today", hint: "Pulled forward by you" },
+  doing: { title: "Doing", hint: "A Session on it – Start or Resume" },
+};
+
+/** What an empty cell says, in the place a Note would take. */
+const GHOSTS: Record<Column, string> = {
+  ready: "No Issue ready to Start",
+  today: "Pull a Note here",
+  doing: "Drop a Note here to Start it in a terminal",
+};
+
+const SWATCH: Record<Pad, string> = { 1: "bg-pad-1", 2: "bg-pad-2", 3: "bg-pad-3", 4: "bg-pad-4" };
+
+const MENU = "w-52 rounded-xl p-1 ring-0 shadow-(--ud-shadow-menu)";
+const ITEM = "h-9 gap-2 rounded-md px-2 text-sm";
+const MENU_TRIGGER = "flex size-8 items-center justify-center rounded-md transition-colors duration-150 hover:bg-alpha-200 focus-visible:shadow-[0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--ud-focus)]";
+
+/** A Project's name that opens its page, as a link reads: underlined under the pointer. */
+function ProjectLink({ project }: { project: Project }) {
   const openProject = useStore((s) => s.openProject);
   return (
-    <Tag className="min-w-0 truncate type-label-14 font-medium">
+    <span className="min-w-0 truncate type-label-13 font-medium">
       <button type="button" onClick={() => openProject(project.path)} className="max-w-full truncate rounded-sm text-left underline-offset-4 hover:underline">
         {project.name}
       </button>
-    </Tag>
+    </span>
   );
 }
 
-/** Open Project in one click, at the end of a card's header: an arrow out of the card, named in its
- * Hint, for whoever does not think to click the name. It is always there, so the keyboard and a
- * first look find it, but faint – `muted` at half – until the pointer is over the card, so a page
- * of cards stays calm. */
-function OpenProject({ project }: { project: Project }) {
-  const openProject = useStore((s) => s.openProject);
+/** The Target under a point of the window: the Cell it is over, the Board, the Shelf, or nothing.
+ * What is dragged does not catch the pointer (it is hidden, or `pointer-events: none`), so the
+ * element found is what lies under it. */
+function dropAt(x: number, y: number): Target {
+  const el = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-drop]");
+  if (!el) return null;
+  if (el.dataset.drop === "shelf") return "shelf";
+  if (el.dataset.drop === "board") return "board";
+  const { lane, column } = el.dataset;
+  return lane && column ? { lane, column: column as Column } : null;
+}
+
+const targetKey = (t: Target) => (t === null ? null : typeof t === "string" ? t : cellKey(t));
+
+/** Where the pointer took hold of an element, and the element's width, for the copy that follows it. */
+function grip(el: HTMLElement | null, e: PointerEvent): Grip {
+  const r = el?.getBoundingClientRect();
+  return r ? { dx: e.clientX - r.left, dy: e.clientY - r.top, width: r.width } : { dx: 0, dy: 0, width: 0 };
+}
+
+/** One drag at a time across the Board and the Shelf: what is dragged, the pointer's place, and
+ * the Target under it, written only when it changes, since the pointer reports every frame. */
+function useBoardDrag(): { dragging: Dragging | null; over: string | null; drag: BoardDrag; px: MotionValue<number>; py: MotionValue<number> } {
+  const [dragging, setDragging] = useState<Dragging | null>(null);
+  const [over, setOver] = useState<string | null>(null);
+  const last = useRef<string | null>(null);
+  const px = useMotionValue(0);
+  const py = useMotionValue(0);
+  const drag = useMemo<BoardDrag>(
+    () => ({
+      begin: (d, e) => {
+        px.set(e.clientX);
+        py.set(e.clientY);
+        setDragging(d);
+        last.current = null;
+      },
+      move: (e) => {
+        px.set(e.clientX);
+        py.set(e.clientY);
+        const k = targetKey(dropAt(e.clientX, e.clientY));
+        if (k !== last.current) {
+          last.current = k;
+          setOver(k);
+        }
+      },
+      end: (e) => {
+        const at = dropAt(e.clientX, e.clientY);
+        setDragging(null);
+        setOver(null);
+        last.current = null;
+        return at;
+      },
+    }),
+    [px, py],
+  );
+  return { dragging, over, drag, px, py };
+}
+
+/** *1 Nov*, the day a Project was put in Focus. */
+const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+
+/** The most pressing Status among a Project's open Sessions, for its tape. */
+function pressing(project: Project, now: Date): { status: StatusName; count: number } | undefined {
+  const all = openStatuses(project, now);
+  return (["Waiting", "Busy", "Quiet"] as StatusName[]).map((s) => all.find((x) => x.status === s)).find(Boolean);
+}
+
+/** A Lane's strip of tape: the Lane's pad colour, the Project's avatar and name. */
+function Tape({ lane, lifted }: { lane: Lane; lifted?: boolean }) {
   return (
-    <Hint label="Open Project">
-      <Action variant="tertiary" size="tiny" aria-label={`Open ${project.name}`} onClick={() => openProject(project.path)} className="shrink-0 text-muted-foreground/50 group-hover/card:text-foreground">
-        <Icon name="open" />
-      </Action>
-    </Hint>
+    <span className={cn("flex h-8 max-w-full items-center gap-2 rounded-sm bg-secondary pr-3 pl-2.5 shadow-[0_1px_1px_#0000000f]", lifted && "shadow-(--ud-shadow-menu)")}>
+      <span aria-hidden="true" className={cn("size-3 shrink-0 rounded-[2px] shadow-[inset_0_0_0_1px_#00000014]", SWATCH[lane.pad])} />
+      <ProjectLink project={lane.project} />
+    </span>
   );
 }
 
-/** The Project a Loose End belongs to, the Status of its Session when one is open, and Open Project. */
-function LooseEndTop({ le, now }: { le: LooseEnd; now: Date }) {
-  const { project, open } = le;
-  const st = open && status(open, now);
+/** The Lane's head: its tape – dragged onto the Shelf, it takes the Project out of Focus – with
+ * a `⋯` of the same, then the Project's Status, its Drift strip and its Focus Gauge. */
+function LaneHead({ lane, now, drag }: { lane: Lane; now: Date; drag: BoardDrag }) {
+  const { project, focus } = lane;
+  const { setFocus, openProject, newSession } = useStore();
+  const ref = useRef<HTMLDivElement>(null);
+  const [lifting, setLifting] = useState(false);
+  const st = pressing(project, now);
+  const days = project.activeDays.length;
   return (
-    <header className="flex min-w-0 items-center gap-2">
-      <ProjectAvatar name={project.name} size={24} />
-      <ProjectLink project={project} />
-      <span className="ml-auto flex shrink-0 items-center gap-2">
-        {st && (
-          <span
-            className={cn(
-              "flex items-center gap-1.5",
-              LIVE_BADGE[st] ? cn("h-6 rounded-full px-2.5 text-xs font-medium", LIVE_BADGE[st]) : "type-label-13 text-text-2",
-            )}
-          >
-            <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[st])} />
-            {st}
-          </span>
-        )}
-        <OpenProject project={project} />
-      </span>
-    </header>
-  );
-}
-
-/** Resume, primary only on the big tile so one button leads the page, then Open Project and Let Go
- * in a `⋯` menu. */
-function LooseEndActions({ le, primary }: { le: LooseEnd; primary: boolean }) {
-  const { resume, letGo, openProject } = useStore();
-  const { project, session } = le;
-  return (
-    <div className="flex items-center gap-2">
-      <Action variant={primary ? "primary" : "secondary"} size="small" onClick={() => resume(project.path, session.id)}>
-        <Icon name="resume" /> Resume
-      </Action>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          aria-label={`More for ${project.name}`}
-          className="flex size-8 items-center justify-center rounded-md transition-colors duration-150 hover:bg-alpha-200 focus-visible:shadow-[0_0_0_2px_var(--ud-surface),0_0_0_4px_var(--ud-focus)]"
+    <div className={cn("flex flex-col items-start gap-2", CELL)}>
+      <div className="flex w-full items-center gap-1">
+        <m.div
+          ref={ref}
+          drag
+          dragSnapToOrigin
+          dragMomentum={false}
+          dragElastic={0}
+          onDragStart={(e) => {
+            setLifting(true);
+            drag.begin({ kind: "lane", lane, grip: grip(ref.current, e as PointerEvent) }, e as PointerEvent);
+          }}
+          onDrag={(e) => drag.move(e as PointerEvent)}
+          onDragEnd={(e) => {
+            if (drag.end(e as PointerEvent) === "shelf") setFocus(project.path, false);
+          }}
+          // The tape itself travels hidden, while its copy follows the pointer beyond the Board's
+          // edge; it shows again once it has sprung back.
+          onDragTransitionEnd={() => setLifting(false)}
+          className={cn("min-w-0 cursor-grab select-none", lifting && "pointer-events-none invisible")}
         >
-          <Icon name="more" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48 rounded-xl p-1 ring-0 shadow-(--ud-shadow-menu)">
-          <DropdownMenuItem onClick={() => openProject(project.path)} className="h-9 gap-2 rounded-md px-2 text-sm">
-            Open Project
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => letGo(project.path, project.name)} className="h-9 gap-2 rounded-md px-2 text-sm">
-            Let Go
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          <Tape lane={lane} />
+        </m.div>
+        <DropdownMenu>
+          <DropdownMenuTrigger aria-label={`More for ${project.name}`} className={cn(MENU_TRIGGER, "shrink-0 opacity-0 group-focus-within/lane:opacity-100 group-hover/lane:opacity-100")}>
+            <Icon name="more" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className={MENU}>
+            <DropdownMenuItem onClick={() => openProject(project.path)} className={ITEM}>
+              Open Project
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => newSession(project.path)} className={ITEM}>
+              New Session
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setFocus(project.path, false)} className={ITEM}>
+              Put back on the Shelf
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      {st && <StatusMark status={st.status} count={st.count} />}
+      <div className="flex w-full flex-col gap-1">
+        <DriftStrip cells={driftCells(project.activeDays, now)} />
+        <span className="type-label-12 text-muted-foreground tabular-nums">
+          {days} active {days === 1 ? "day" : "days"}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Gauge value={focus.active} max={focus.days} size={28} label={`${focus.active} of ${focus.days} days with Activity since ${day(project.focusSince!)}`} />
+        <span className="type-label-12 text-muted-foreground tabular-nums">
+          of {focus.days} {focus.days === 1 ? "day" : "days"} · since {day(project.focusSince!)}
+        </span>
+      </div>
     </div>
   );
 }
 
-function LooseEndCard({ le, now }: { le: LooseEnd; now: Date }) {
-  const { project, session } = le;
-  const branch = project.repo?.branch;
+function LaneRow({
+  lane,
+  now,
+  notes,
+  dragging,
+  over,
+  drag,
+  onMove,
+}: {
+  lane: Lane;
+  now: Date;
+  notes: "blank" | "skeleton" | "ready";
+  dragging: Dragging | null;
+  over: string | null;
+  drag: BoardDrag;
+  onMove: (project: Project, issue: Issue, from: Column, to: Column) => void;
+}) {
+  const { project } = lane;
   return (
-    <article className={TILE}>
-      <LooseEndTop le={le} now={now} />
-      {/* What you were doing leads the card; the Project and the numbers only frame it. */}
-      <div className="flex flex-col gap-1">
-        <h3 className="line-clamp-2 type-heading-16">{session.title}</h3>
-        {session.lastPrompt && <p className="line-clamp-2 type-copy-14 text-text-2">“{session.lastPrompt}”</p>}
-      </div>
-      <Activity project={project} now={now} />
-      <div className="mt-auto flex flex-col gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <Diff project={project} />
-          {branch && !DEFAULT_BRANCHES.includes(branch) && (
-            <span className="flex min-w-0 items-center gap-1.5 type-label-13-mono text-muted-foreground">
-              <Icon name="branch" size={14} className="shrink-0" />
-              <span className="truncate">{branch}</span>
+    <div className={cn(LANE_GRID, "group/lane border-t border-dashed border-line-strong")}>
+      <LaneHead lane={lane} now={now} drag={drag} />
+      {COLUMNS.map((column) => {
+        const key = cellKey({ lane: project.path, column });
+        // Only a Note of this Lane, from another column, can land here: no ring says no.
+        const legal = dragging?.kind === "note" && dragging.lane === project.path && dragging.column !== column;
+        const issues = lane[column];
+        const empty = issues.length === 0 && (column !== "doing" || lane.cards.length === 0);
+        // One row, never two: each piece of paper gets a column it may overflow, and the columns
+        // shrink together when the cell is short of room, so the pieces overlap like paper on a
+        // wall – the last laid down whole, the earlier ones peeking out from under it. The last
+        // column keeps its full width, so the last piece never crosses the cell's edge.
+        const widths = [...(column === "doing" ? lane.cards.map(() => 268) : []), ...(notes === "ready" ? issues.map(() => 136) : [])];
+        const template = widths.map((w, i) => (i === widths.length - 1 ? `${w}px` : `minmax(28px, ${w + 12}px)`)).join(" ");
+        return (
+          <div
+            key={column}
+            data-drop="cell"
+            data-lane={project.path}
+            data-column={column}
+            style={{ gridTemplateColumns: template || undefined }}
+            className={cn("grid min-h-[188px] content-start justify-start border-l border-border", CELL, legal && over === key && "rounded-lg ring-2 ring-mark")}
+          >
+            {column === "doing" && lane.cards.map((card) => <SessionCard key={card.id} project={project} card={card} now={now} />)}
+            {notes === "skeleton" ? (
+              <Bar className="size-[136px] rounded-[2px]" />
+            ) : notes === "ready" && empty ? (
+              <NoteGhost>{GHOSTS[column]}</NoteGhost>
+            ) : (
+              notes === "ready" && issues.map((issue) => <Note key={issue.url} project={project} issue={issue} column={column} pad={lane.pad} drag={drag} onMove={(i, from, to) => onMove(project, i, from, to)} />)
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The one thing to pick up, beside the greeting so the Board keeps the height: the title over
+ * the Project and the reason, then the key and the button that do it. */
+function UpNextLine({ next }: { next: UpNext }) {
+  const pickUpNext = useStore((s) => s.pickUpNext);
+  return (
+    <div className="flex h-14 min-w-0 max-w-[720px] flex-1 items-center gap-3 rounded-xl py-2 pr-2 pl-4 material-small">
+      <span className="shrink-0 type-label-12 text-muted-foreground">Up Next</span>
+      {next ? (
+        <>
+          <ProjectAvatar name={next.project.name} size={28} />
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate type-label-14 font-medium">
+              {next.kind === "resume" ? (
+                next.session.title
+              ) : (
+                <>
+                  <span className="font-mono font-normal text-muted-foreground">#{next.issue.number}</span> {next.issue.title}
+                </>
+              )}
             </span>
-          )}
-          <span className="ml-auto shrink-0">
-            <When iso={session.lastActivity} now={now} />
+            <span className="flex min-w-0 items-center gap-1.5 type-label-13 text-muted-foreground tabular-nums">
+              <ProjectLink project={next.project} />
+              <span aria-hidden="true">·</span>
+              <span className="truncate">{next.why}</span>
+            </span>
           </span>
-        </div>
-        <LooseEndActions le={le} primary={false} />
-      </div>
-    </article>
-  );
-}
-
-/** Files the big tile lists before "N more". */
-const HERO_FILES = 5;
-
-/** The Loose End to pick up first, as the band's 2×2 tile (DESIGN.md § Layout). Its size says it
- * matters most, so it carries what a small card has no room for: the files left changed and the
- * last commit, which answer "what was done" before Resume. */
-function Hero({ le, section, now }: { le: LooseEnd; section: SectionName; now: Date }) {
-  const { project, session } = le;
-  const repo = project.repo;
-  const files = repo?.files ?? [];
-  const more = (repo?.changed ?? 0) - Math.min(files.length, HERO_FILES);
-  const issues = project.issues.length;
-  return (
-    <article className={cn(TILE, "col-span-2 row-span-2 gap-4 p-6")}>
-      <LooseEndTop le={le} now={now} />
-      <div className="flex flex-col gap-2">
-        <p className="type-label-13 text-muted-foreground">
-          {section} · <When iso={session.lastActivity} now={now} />
-        </p>
-        <h2 className="line-clamp-2 type-heading-24">{session.title}</h2>
-        {session.lastPrompt && <p className="line-clamp-3 type-copy-14 text-text-2">“{session.lastPrompt}”</p>}
-      </div>
-      <Activity project={project} now={now} />
-      {files.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <ul className="flex flex-col gap-1">
-            {files.slice(0, HERO_FILES).map((f) => (
-              <li key={f.path} className="flex min-w-0 items-center gap-3 type-label-13-mono">
-                <span className="grow truncate text-text-2">{f.path}</span>
-                <span className="shrink-0 text-muted-foreground tabular-nums">
-                  {fileLines(f)}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="truncate type-label-13 text-muted-foreground">
-            {more > 0 && `${more} more · `}
-            {repo?.headSubject && <>Last commit: <span className="text-text-2">{repo.headSubject}</span></>}
-          </p>
-        </div>
-      )}
-      <div className="mt-auto flex items-center justify-between gap-3">
-        <LooseEndActions le={le} primary />
-        <span className="flex min-w-0 items-center gap-3 type-label-13 text-muted-foreground tabular-nums">
-          <Diff project={project} />
-          {issues > 0 && <span className="shrink-0">{issues} {issues === 1 ? "Issue" : "Issues"}</span>}
-        </span>
-      </div>
-    </article>
-  );
-}
-
-/** Focus as the band's second 2×2 tile (DESIGN.md § Layout): a row per Project in Focus, in the
- * order chosen, with the Project page's Gauge – the days with Activity since the choice. A name
- * opens the page. Nothing else: the tile sums up the intention, as the Hero sums up what was left. */
-function FocusTile({ focus }: { focus: FocusPart[] }) {
-  return (
-    <section className={cn(TILE, "col-span-2 row-span-2 gap-4 p-6")}>
-      <h2 className="type-label-14 font-medium">Focus</h2>
-      {focus.length === 0 ? (
-        <p className="type-label-13 text-muted-foreground">Nothing in Focus. Choose up to three on a Project page.</p>
-      ) : (
-        <ul className="flex flex-col gap-4">
-          {focus.map((f) => (
-            <li key={f.project.path} className="flex min-w-0 items-center gap-4">
-              <Gauge value={f.active} max={f.days} label={`${f.active} of ${f.days} days with Activity`} />
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <span className="flex min-w-0 items-center gap-2 type-label-14 font-medium">
-                  <ProjectAvatar name={f.project.name} size={20} />
-                  <ProjectLink project={f.project} />
-                </span>
-                <span className="type-label-13 text-muted-foreground tabular-nums">
-                  {f.active} of {f.days} {f.days === 1 ? "day" : "days"} with Activity · since{" "}
-                  {new Date(f.project.focusSince!).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                </span>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-/** A section of cards: its name and count above a grid that fills the width. */
-function Section({ title, count, aside, grid = GRID, children }: { title: string; count: number; aside?: ReactNode; grid?: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 type-label-14 font-medium">
-          {title}
-          <span className="type-label-13 text-muted-foreground tabular-nums">{count}</span>
-        </h2>
-        {aside}
-      </div>
-      <div className={grid}>{children}</div>
-    </section>
-  );
-}
-
-function Card({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-3">
-      <h2 className="type-label-14 font-medium">{title}</h2>
-      <div className="rounded-xl material-small">{children}</div>
-    </section>
-  );
-}
-
-/** Issues a Project card shows before Show All: enough to pick the next one, few enough that the
- * Issues never outweigh the Loose Ends. */
-const ISSUES_PER_CARD = 3;
-
-function ProjectIssues({ project, issues, all }: { project: Project; issues: Issue[]; all: boolean }) {
-  const { start } = useStore();
-  const shown = all ? issues : issues.slice(0, ISSUES_PER_CARD);
-  return (
-    <article className={TILE}>
-      <header className="flex min-w-0 items-center gap-2">
-        <ProjectAvatar name={project.name} size={24} />
-        <ProjectLink project={project} as="h3" />
-        <span className="type-label-13 text-muted-foreground tabular-nums">{issues.length}</span>
-        <span className="ml-auto flex">
-          <OpenProject project={project} />
-        </span>
-      </header>
-      <ul className="flex flex-col gap-1">
-        {shown.map((issue) => (
-          // The row lights up as a whole and its Start has no frame, so the titles read first.
-          <li key={issue.url} className="-mx-2 flex min-w-0 items-center gap-2 rounded-md px-2 transition-colors duration-150 hover:bg-alpha-100">
-            <span className="type-label-13-mono text-muted-foreground tabular-nums">#{issue.number}</span>
-            <span className="grow truncate type-label-14">{issue.title}</span>
-            <Action variant="tertiary" size="small" onClick={() => start(project.path, issue.number)} aria-label={`Start #${issue.number} in ${project.name}`}>
-              <Icon name="start" /> Start
+          <span className="ml-auto flex shrink-0 items-center gap-2">
+            <Key>Enter</Key>
+            <Action size="small" onClick={pickUpNext}>
+              <Icon name={next.kind} /> {next.kind === "resume" ? "Resume" : "Start"}
             </Action>
-          </li>
-        ))}
-      </ul>
-      {shown.length < issues.length && <p className="mt-auto type-label-13 text-muted-foreground tabular-nums">{issues.length - shown.length} more</p>}
-    </article>
-  );
-}
-
-// Two across under the Loose Ends, as the sections are; one in the right column, 360 px wide.
-const ISSUES_GRID = "grid grid-cols-2 gap-4 xl:grid-cols-1";
-
-function ReadyToStart({ groups }: { groups: { project: Project; issues: Issue[] }[] }) {
-  const [all, setAll] = useState(false);
-  if (groups.length === 0) return null;
-  const total = groups.reduce((n, g) => n + g.issues.length, 0);
-  const hiding = groups.some((g) => g.issues.length > ISSUES_PER_CARD);
-  return (
-    <Section
-      title="Ready to Start"
-      count={total}
-      grid={ISSUES_GRID}
-      aside={
-        hiding && (
-          <Action variant="tertiary" size="small" aria-expanded={all} onClick={() => setAll(!all)}>
-            {all ? "Show Fewer" : `Show All ${total}`}
-          </Action>
-        )
-      }
-    >
-      {groups.map((g) => (
-        <ProjectIssues key={g.project.path} project={g.project} issues={g.issues} all={all} />
-      ))}
-    </Section>
-  );
-}
-
-/** One open Session in Needs You: its Project, its title and since when it is in its Status. The
- * whole row opens the Project page, which lists the Session with where it runs. It has no Resume:
- * the Session already runs, and a second `claude` on it would fight the first. */
-function NeedItem({ row, now }: { row: NeedRow; now: Date }) {
-  const openProject = useStore((s) => s.openProject);
-  const { project, open, title } = row;
-  return (
-    <li>
-      <button
-        type="button"
-        onClick={() => openProject(project.path)}
-        className="flex w-full min-w-0 items-center gap-3 rounded-md px-2 py-2 text-left transition-colors duration-150 hover:bg-alpha-100"
-      >
-        <ProjectAvatar name={project.name} size={24} />
-        <span className="flex min-w-0 grow flex-col">
-          <span className="truncate type-label-13 text-muted-foreground">{project.name}</span>
-          <span className={cn("truncate type-label-14", !title && "text-muted-foreground")}>{title ?? "No title yet"}</span>
-        </span>
-        {open.statusSince && <When iso={open.statusSince} now={now} />}
-      </button>
-    </li>
-  );
-}
-
-/** The Sessions of one Status under a quieter label than the block's own. */
-function NeedGroup({ label, rows, now }: { label: string; rows: NeedRow[]; now: Date }) {
-  if (rows.length === 0) return null;
-  return (
-    <div className="flex flex-col gap-1">
-      <h3 className="flex items-center gap-2 px-2 pt-1 type-label-12 text-muted-foreground">
-        {label}
-        <span className="tabular-nums">{rows.length}</span>
-      </h3>
-      <ul className="flex flex-col">
-        {rows.map((r) => (
-          <NeedItem key={r.open.id} row={r} now={now} />
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/** The open Sessions waiting on you across every Project, then, under quieter labels, the ones at
- * work and the ones gone quiet in the last day – a Session left overnight is quiet by the morning.
- * A Session in a Project with nothing left uncommitted is no Loose End, so without this block it
- * would only be counted in the Sessions Open tile. Under 1280 px Home keeps one column and the
- * Sessions Open tile alone. */
-function NeedsYou({ waiting, busy, quiet, now }: { waiting: NeedRow[]; busy: NeedRow[]; quiet: NeedRow[]; now: Date }) {
-  if (waiting.length + busy.length + quiet.length === 0) return null;
-  return (
-    <section className="hidden flex-col gap-3 xl:flex">
-      <h2 className="flex items-center gap-2 type-label-14 font-medium">
-        Needs You
-        {waiting.length > 0 && <span className="type-label-13 text-muted-foreground tabular-nums">{waiting.length}</span>}
-      </h2>
-      <div className="flex flex-col gap-2 rounded-xl p-2 material-small">
-        {waiting.length > 0 ? (
-          <ul className="flex flex-col">
-            {waiting.map((r) => (
-              <NeedItem key={r.open.id} row={r} now={now} />
-            ))}
-          </ul>
-        ) : (
-          <p className="p-2 type-label-13 text-muted-foreground">No Session waits on you.</p>
-        )}
-        <NeedGroup label="Busy" rows={busy} now={now} />
-        <NeedGroup label="Quiet" rows={quiet} now={now} />
-      </div>
-    </section>
-  );
-}
-
-/** Nothing is left: say so, then offer the Projects touched last. */
-function NothingLeft({ projects, now }: { projects: Project[]; now: Date }) {
-  const { resume } = useStore();
-  const recent = touchedLast(projects);
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="rounded-xl material-small">
-        <Empty icon={<Icon name="commit" size={20} />} title="Nothing left half-done.">
-          Every change a Session left behind is committed and pushed, or let go of.
-        </Empty>
-      </div>
-      {recent.length > 0 && (
-        <Card title="Touched Last">
-          {recent.map(({ project, session }) => (
-            <div key={project.path} className={cn("grid grid-cols-[minmax(0,1fr)_auto_110px_auto]", ROW)}>
-              <span className="flex min-w-0 items-center gap-3">
-                <ProjectAvatar name={project.name} size={28} />
-                <ProjectLink project={project} />
-              </span>
-                      <When iso={session.lastActivity} now={now} />
-              <Action variant="secondary" size="small" onClick={() => resume(project.path, session.id)}>
-                <Icon name="resume" /> Resume
-              </Action>
-            </div>
-          ))}
-        </Card>
+          </span>
+        </>
+      ) : (
+        <span className="type-label-13 text-text-2">Nothing to pick up – pull a Note into Today.</span>
       )}
     </div>
   );
 }
 
-/** Home in Skeletons while the Loose Ends are read: the band – the big tile and the Focus tile –
- * then a section of cards, so the page keeps its shape when they come in. */
-function HomeSkeleton() {
+function ShelfMark({ mark, name, now }: { mark: ShelfEntry["mark"]; name: string; now: Date }) {
+  switch (mark.kind) {
+    case "waiting":
+      return (
+        <span className="flex shrink-0 items-center gap-1.5 type-label-12 tabular-nums">
+          <span aria-hidden="true" className={cn("size-2 rounded-full", STATUS_DOT.Waiting)} />
+          Waiting{mark.since && ` · ${elapsed(mark.since, now)}`}
+        </span>
+      );
+    case "busy":
+      return (
+        <span className="flex shrink-0 items-center gap-1.5 type-label-12 text-muted-foreground">
+          <span aria-hidden="true" className={cn("size-2 rounded-full", STATUS_DOT.Busy)} />
+          Busy
+        </span>
+      );
+    case "leftOff":
+      return (
+        <span className="flex shrink-0 items-center gap-1 type-label-12 tabular-nums">
+          <Icon name="leftOff" size={12} className="fill-current" />
+          Left off · {elapsed(mark.since, now)}
+        </span>
+      );
+    case "group":
+      return <GroupDot name={name} group={mark.group} />;
+  }
+}
+
+/** A Project's row on the Shelf: its 24 px avatar, its name over its one mark – the shape of the
+ * rows Needs You had. Lifted, it is the copy that follows the pointer. */
+function ShelfRow({ item, now, lifted }: { item: ShelfEntry; now: Date; lifted?: boolean }) {
+  const { project, mark } = item;
+  return (
+    <span className={cn("flex w-full items-center gap-3 rounded-md px-2 py-2", lifted ? "material-small shadow-(--ud-shadow-menu)" : "transition-colors duration-150 hover:bg-alpha-100")}>
+      <ProjectAvatar name={project.name} size={24} />
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="truncate type-label-13 font-medium">{project.name}</span>
+        <span className="flex h-4 items-center text-muted-foreground">
+          <ShelfMark mark={mark} name={project.name} now={now} />
+        </span>
+      </span>
+    </span>
+  );
+}
+
+/** A Project on the Shelf. A click opens its page; dragged onto the Board it goes into Focus –
+ * the bridge refuses a fourth, and its words reach the toast. */
+function ShelfItem({ item, now, drag }: { item: ShelfEntry; now: Date; drag: BoardDrag }) {
+  const { project } = item;
+  const openProject = useStore((s) => s.openProject);
+  const setFocus = useStore((s) => s.setFocus);
+  const ref = useRef<HTMLButtonElement>(null);
+  const [lifting, setLifting] = useState(false);
+  return (
+    <m.button
+      ref={ref}
+      type="button"
+      drag
+      dragSnapToOrigin
+      dragMomentum={false}
+      dragElastic={0}
+      onDragStart={(e) => {
+        setLifting(true);
+        drag.begin({ kind: "project", item, grip: grip(ref.current, e as PointerEvent) }, e as PointerEvent);
+      }}
+      onDrag={(e) => drag.move(e as PointerEvent)}
+      onDragEnd={(e) => {
+        if (drag.end(e as PointerEvent) === "board") setFocus(project.path, true);
+      }}
+      onDragTransitionEnd={() => setLifting(false)}
+      onClick={() => openProject(project.path)}
+      draggable={false}
+      className={cn("flex w-full cursor-grab rounded-md text-left select-none not-first:shadow-[0_-1px_0_0_var(--ud-line)]", lifting && "pointer-events-none invisible")}
+    >
+      <ShelfRow item={item} now={now} />
+    </m.button>
+  );
+}
+
+/** The Shelf beside the Board: one `material-small` card of rows, the ones that need you first on
+ * top, scrolling on its own when it holds more than the window shows. A tape dropped on it takes
+ * its Project off the Board. */
+function Shelf({ items, now, drag, ring }: { items: ShelfEntry[]; now: Date; drag: BoardDrag; ring: boolean }) {
+  return (
+    <section data-drop="shelf" aria-labelledby="shelf" className="flex min-h-0 flex-col gap-3">
+      <div className="flex shrink-0 flex-col gap-0.5 px-1">
+        <h2 id="shelf" className="type-label-14 font-medium">
+          Shelf <span className="type-label-13 font-normal text-muted-foreground tabular-nums">{items.length}</span>
+        </h2>
+        <p className="type-label-12 text-muted-foreground">The ones that need you first. Drag one onto the Board to work on it.</p>
+      </div>
+      <div className={cn("flex min-h-0 flex-col overflow-y-auto rounded-xl p-2 material-small", ring && "ring-2 ring-mark")}>
+        {items.map((item) => (
+          <ShelfItem key={item.project.path} item={item} now={now} drag={drag} />
+        ))}
+        {items.length === 0 && <p className="px-2 py-3 type-label-13 text-balance text-muted-foreground">Every Project is on the Board.</p>}
+      </div>
+    </section>
+  );
+}
+
+/** The copy of a row or a tape that follows the pointer: the Board and the Shelf scroll on their
+ * own and clip what leaves them, so the original travels hidden and this one, fixed to the
+ * window, is what is seen. It catches no pointer, so the drop still reads what lies under it. */
+function DragOverlay({ dragging, px, py, now }: { dragging: Dragging | null; px: MotionValue<number>; py: MotionValue<number>; now: Date }) {
+  if (!dragging || dragging.kind === "note") return null;
+  const { dx, dy, width } = dragging.grip;
+  return (
+    <m.div aria-hidden="true" className="pointer-events-none fixed top-0 left-0 z-50" style={{ x: px, y: py }}>
+      <div className="origin-top-left scale-[1.02]" style={{ marginLeft: -dx, marginTop: -dy, width: width || undefined }}>
+        {dragging.kind === "project" ? <ShelfRow item={dragging.item} now={now} lifted /> : <Tape lane={dragging.lane} lifted />}
+      </div>
+    </m.div>
+  );
+}
+
+/** Home in Skeletons while the transcripts and git are read: the Up Next line and a Board of two
+ * Lanes beside an empty Shelf, so the page keeps its shape when they come in. */
+function BoardSkeleton() {
   return (
     <>
-      <div className="grid grid-cols-4 gap-4">
-        <div className={cn(TILE, "col-span-2 row-span-2 gap-4 p-6")}>
-          <Bar className="h-6 w-1/3" />
-          <Bar className="h-8 w-3/4" />
-          <Bar className="h-4 w-2/3" />
-          <Bar className="mt-auto h-8 w-24" />
-        </div>
-        <div className={cn(TILE, "col-span-2 row-span-2 gap-4 p-6")}>
-          <Bar className="h-4 w-16" />
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="flex items-center gap-4">
-              <Bar className="size-10 rounded-full" />
-              <div className="flex grow flex-col gap-1.5">
-                <Bar className="h-4 w-1/3" />
-                <Bar className="h-3 w-1/2" />
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_232px] gap-6">
+        <div className="overflow-hidden rounded-2xl material-small">
+          <div className={LANE_GRID}>
+            <div />
+            {COLUMNS.map((c) => (
+              <div key={c} className="flex flex-col gap-1.5 border-l border-border px-3 pt-4 pb-2">
+                <Bar className="h-4 w-16" />
+                <Bar className="h-3 w-28" />
               </div>
+            ))}
+          </div>
+          {[0, 1].map((i) => (
+            <div key={i} className={cn(LANE_GRID, "border-t border-dashed border-line-strong")}>
+              <div className={cn("flex flex-col gap-3", CELL)}>
+                <Bar className="h-8 w-36" />
+                <Bar className="h-3.5 w-full" />
+              </div>
+              {COLUMNS.map((c) => (
+                <div key={c} className={cn("border-l border-border", CELL)}>
+                  <Bar className="size-[136px] rounded-[2px]" />
+                </div>
+              ))}
             </div>
           ))}
+        </div>
+        <div className="flex flex-col gap-3">
+          <Bar className="h-4 w-16" />
+          <div className="flex flex-col gap-3 rounded-xl p-4 material-small">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Bar className="size-6" />
+                <Bar className="h-4 w-2/3" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-      <section className="flex flex-col gap-3">
-        <Bar className="h-4 w-24" />
-        <div className={GRID}>
-          {[0, 1].map((i) => (
-            <div key={i} className={TILE}>
-              <Bar className="h-6 w-1/2" />
-              <Bar className="h-5 w-3/4" />
-              <Bar className="h-4 w-full" />
-              <Bar className="h-8 w-24" />
-            </div>
-          ))}
-        </div>
-      </section>
     </>
   );
 }
 
-/** Ready to Start in Skeletons while `gh` has not answered: its name, then two cards of rows, in
- * the place the Issues will take. Never *nothing*, since no card is not the same as not read. */
-function ReadyToStartSkeleton() {
-  return (
-    <section className="flex flex-col gap-3">
-      <h2 className="type-label-14 font-medium">Ready to Start</h2>
-      <div className={ISSUES_GRID}>
-        {[0, 1].map((i) => (
-          <div key={i} className={TILE}>
-            <div className="flex items-center gap-2">
-              <Bar className="size-6" />
-              <Bar className="h-4 w-28" />
-            </div>
-            {[0, 1, 2].map((j) => (
-              <Bar key={j} className="h-4 w-full" />
-            ))}
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 export function Home() {
-  const githubRead = useStore((s) => s.read.github);
-  // Home greets the account by its first name; without one it keeps its own.
   const firstName = useStore((s) => s.user?.name.split(" ")[0]);
+  const githubRead = useStore((s) => s.read.github);
   const now = useNow();
-  // The Loose Ends need the transcripts and git; Ready to Start needs GitHub as well. Until then
-  // each shows its Skeletons, so Home never says *Nothing left half-done.* before it knows.
-  const { phase: loosePhase, projects } = useProjectsRead();
-  const issuesPhase = useSkeleton(loosePhase !== "ready" || !githubRead);
+  // The Lanes and the Cards need the transcripts and git; the Notes need GitHub as well. Until
+  // then each cell shows a Skeleton, never a Ghost that says there is nothing.
+  const { phase, projects } = useProjectsRead();
+  const notesPhase = useSkeleton(phase !== "ready" || !githubRead);
+  const { dragging, over, drag, px, py } = useBoardDrag();
+
+  // A Note just moved is drawn where it was dropped until the bridge's list agrees – or says no.
+  const [flight, setFlight] = useState<Record<string, Column>>({});
+  const land = useCallback(
+    (url: string) =>
+      setFlight((f) => {
+        if (!(url in f)) return f;
+        const next = { ...f };
+        delete next[url];
+        return next;
+      }),
+    [],
+  );
+  useEffect(() => {
+    if (!projects) return;
+    const issues = new Map(projects.flatMap((p) => p.issues).map((i) => [i.url, i]));
+    for (const url of Object.keys(flight)) {
+      const issue = issues.get(url);
+      if (!issue || columnOf(issue) === flight[url]) land(url);
+    }
+    // Only a new list can land a Note; the map itself changing must not run this again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projects, land]);
+
+  const onMove = useCallback(
+    (project: Project, issue: Issue, from: Column, to: Column) => {
+      setFlight((f) => ({ ...f, [issue.url]: to }));
+      const { start, setToday, forgetStart } = useStore.getState();
+      const { path } = project;
+      let call: Promise<boolean>;
+      if (to === "doing") call = start(path, issue.number);
+      else if (from === "doing") {
+        // Out of Doing, a Note is back in Today only if it was pulled there before.
+        const today = to === "today";
+        call = forgetStart(path, issue.number).then((ok) => (ok && today !== !!issue.todaySince ? setToday(path, issue.number, today) : ok));
+      } else call = setToday(path, issue.number, to === "today");
+      void call.then((ok) => {
+        if (!ok) land(issue.url);
+      });
+      // The bridge answers within a tick or two; past 8 s the Note shows what the list says.
+      setTimeout(() => land(issue.url), 8000);
+    },
+    [land],
+  );
+
+  const all = projects ? lanes(projects, now, flight) : [];
   const groups = projects ? looseEnds(projects, now) : [];
   const total = groups.reduce((n, g) => n + g.items.length, 0);
   const night = groups.find((g) => g.section === "Last Night")?.items.length ?? 0;
-  // The first Loose End – live first, then the newest section – becomes the big tile, and leaves
-  // its section; a section it empties is not drawn.
-  const hero = groups[0]?.items[0];
-  const rest = groups.map((g) => ({ ...g, items: g.items.filter((le) => le !== hero) })).filter((g) => g.items.length > 0);
-  const focus = projects ? focusRows(projects, now) : [];
   const counts = projects ? headline(projects, groups) : { unpushed: 0, open: 0 };
-  // The greeting's line: the Loose Ends, then the counts that matter beside them, each only above
-  // zero – a figure at zero says nothing worth a word.
+  const waiting = projects ? needsYou(projects, now).waiting[0] : undefined;
+  // The greeting's line: the Loose Ends, the counts that matter beside them, each only above zero,
+  // and the Session that has waited on you longest – it runs in its own window, so it is named here
+  // rather than offered as Up Next.
   const line = [
-    `${total} Loose ${total === 1 ? "End" : "Ends"}${night > 0 ? ` – ${night} from last night` : ""}`,
+    total > 0 ? `${total} Loose ${total === 1 ? "End" : "Ends"}${night > 0 ? ` – ${night} from last night` : ""}` : "Nothing left half-done",
     counts.unpushed > 0 && `${counts.unpushed} ${counts.unpushed === 1 ? "commit" : "commits"} not pushed`,
     counts.open > 0 && `${counts.open} ${counts.open === 1 ? "Session" : "Sessions"} open`,
+    waiting && `${waiting.project.name} waits on you${waiting.open.statusSince ? ` · ${elapsed(waiting.open.statusSince, now)}` : ""}`,
   ]
     .filter(Boolean)
     .join(" · ");
-  const issues = projects && issuesPhase === "ready" ? issuesByProject(projects) : [];
-  const needs = projects ? needsYou(projects, now) : { waiting: [], busy: [], quiet: [] };
-  const needed = needs.waiting.length + needs.busy.length + needs.quiet.length > 0;
-  const issuesShown = issues.length > 0 || issuesPhase === "skeleton";
-  // The right column is drawn only with something in it, so an empty one takes no width; under
-  // 1280 px it holds only Ready to Start, since Needs You shows from there.
-  const hasRightColumn = issuesShown || needed;
+  const next = projects ? upNext(projects, now) : null;
+  const items = projects ? shelf(projects, now) : [];
+  const count = (c: Column) => all.reduce((n, l) => n + (c === "ready" ? l.ready.filter((i) => i.blockedBy === 0).length : c === "doing" ? l.doing.length + l.cards.length : l.today.length), 0);
+  // A folder may land on the Board while it has room; a tape may land on the Shelf.
+  const boardRing = dragging?.kind === "project" && over === "board" && all.length < MAX_LANES;
+  const shelfRing = dragging?.kind === "lane" && over === "shelf";
 
   return (
-    // One column under 1280 px, where the right column falls under the Loose Ends as Ready to Start
-    // always has. From there it takes 360 px and stays in view while the Loose Ends scroll;
-    // `items-start` keeps it to its own height, or it would fill the row and have nowhere to stick.
-    <div className={cn("grid w-full grid-cols-1 items-start gap-8 px-8 py-8", hasRightColumn && "xl:grid-cols-[minmax(0,1fr)_360px]")}>
-      <div className="flex min-w-0 flex-col gap-8">
-        {/* The column keeps 32 px between its parts; the greeting sits closer to what it introduces. */}
-        <header className="-mb-4 flex flex-col gap-1">
+    // The page takes the window's height and never scrolls itself: the Board and the Shelf do.
+    <div className={cn("flex h-full w-full flex-col gap-5 px-8 pt-6 pb-6", dragging && "select-none")}>
+      {/* The greeting on the left, Up Next on the right: one row, so the Board gets the height. */}
+      <header className="flex shrink-0 items-center justify-between gap-8">
+        <div className="flex min-w-0 shrink-0 flex-col gap-1">
           <h1 className="type-heading-24">{firstName ? `Hello, ${firstName}` : "Home"}</h1>
-          {projects && total > 0 && <p className="type-copy-14 text-text-2">{line}.</p>}
-        </header>
-        {loosePhase === "skeleton" && <HomeSkeleton />}
-        {projects &&
-          (!hero ? (
-            <NothingLeft projects={projects} now={now} />
-          ) : (
-            <>
-              <div className="grid grid-cols-4 gap-4">
-                <Hero le={hero} section={groups[0].section} now={now} />
-                <FocusTile focus={focus} />
+          {projects && <p className="type-copy-14 text-text-2">{line}.</p>}
+        </div>
+        {projects && <UpNextLine next={next} />}
+      </header>
+      {phase === "skeleton" && <BoardSkeleton />}
+      {projects && (
+        <>
+          <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_232px] gap-6">
+            <section data-drop="board" aria-label="The Board" className={cn("relative min-h-0 overflow-y-auto rounded-2xl material-small", boardRing && "ring-2 ring-mark")}>
+              {/* The ground and the Lanes sit in one block as tall as the Board at least, so the
+                  dots cover it to the bottom whether it holds one Lane or three. */}
+              <div className="relative min-h-full pb-2">
+                <div aria-hidden="true" className="pointer-events-none absolute inset-0 dotted" />
+                {all.length === 0 ? (
+                  <div className="relative flex min-h-full items-center justify-center">
+                    <Empty icon={<Icon name="projects" size={20} />} title="Nothing on the Board.">
+                      Drag a Project from the Shelf here, or choose Focus on its page – four at most. The Board shows their Issues, Ready, Today and Doing.
+                    </Empty>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className={LANE_GRID}>
+                      <div />
+                      {COLUMNS.map((c) => (
+                        <div key={c} className="flex flex-col gap-0.5 border-l border-border px-3 pt-3 pb-1.5">
+                          <span className="type-label-14 font-medium">
+                            {HEADS[c].title} <span className="type-label-13 font-normal text-muted-foreground tabular-nums">{notesPhase === "ready" || c === "doing" ? count(c) : ""}</span>
+                          </span>
+                          <span className="type-label-12 text-muted-foreground">{HEADS[c].hint}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {all.map((lane) => (
+                      <LaneRow key={lane.project.path} lane={lane} now={now} notes={notesPhase} dragging={dragging} over={over} drag={drag} onMove={onMove} />
+                    ))}
+                  </div>
+                )}
               </div>
-              {rest.map((g) => (
-                <Section key={g.section} title={g.section} count={g.items.length}>
-                  {g.items.map((le) => (
-                    <LooseEndCard key={le.project.path} le={le} now={now} />
-                  ))}
-                </Section>
-              ))}
-            </>
-          ))}
-      </div>
-      {hasRightColumn && (
-        // Under 1280 px a column holding only a hidden Needs You would still add the grid's gap.
-        // From there it is no taller than the window under the header, and scrolls on its own, so
-        // its last card stays in reach while the Loose Ends scroll. Its 4 px of padding, taken back
-        // by the margin, keep the cards' edges from being clipped by the scroll box.
-        <aside
-          className={cn(
-            "flex min-w-0 flex-col gap-8 xl:sticky xl:top-7 xl:-m-1 xl:max-h-[calc(100dvh-6.5rem)] xl:overflow-y-auto xl:p-1",
-            !issuesShown && "max-xl:hidden",
-          )}
-        >
-          <NeedsYou waiting={needs.waiting} busy={needs.busy} quiet={needs.quiet} now={now} />
-          {issuesPhase === "skeleton" ? <ReadyToStartSkeleton /> : <ReadyToStart groups={issues} />}
-        </aside>
+            </section>
+            <Shelf items={items} now={now} drag={drag} ring={shelfRing} />
+          </div>
+        </>
       )}
+      <DragOverlay dragging={dragging} px={px} py={py} now={now} />
     </div>
   );
 }

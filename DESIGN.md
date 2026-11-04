@@ -2,7 +2,8 @@
 
 Undrift speaks Vercel's **Geist** design language: an achromatic interface with gray-1000 primary
 buttons, one blue for marks, links and focus, status colour as small dots or a subtle Badge, edges
-drawn with a 1 px shadow, tight headings. Calm by restraint – nothing blinks, nothing shouts. References: [vercel.com/geist](https://vercel.com/geist/introduction)
+drawn with a 1 px shadow, tight headings – and, on the Board alone, paper, which has colour (§ Colour,
+Paper). Calm by restraint – nothing blinks, nothing shouts. References: [vercel.com/geist](https://vercel.com/geist/introduction)
 and design-bites' [vercel.com DESIGN.md](https://github.com/educlopez/design-bites/blob/main/design-mds/vercel.com/DESIGN.md);
 the colour values below are Geist's own, read from vercel.com's stylesheet.
 
@@ -28,50 +29,68 @@ window. A view is described here once it is built; until then this section holds
   avatar and the controls never drag.
 - **Find** (`F` or `Ctrl K`): Geist's Command Menu over Projects, the last Sessions (Enter
   resumes), the pages and the actions – the theme, Refresh and Quit.
-- **Home**, the first page (ADR 0001): the Loose Ends in three sections – Last Night (since 18:00 the
-  day before), This Week, Older – newest first; within a section a busy or waiting Session first, then the biggest diff. Each shows
-  its Project, the last Session's title and last prompt, files changed with +/− (left out
-  when no tracked line changed), the branch unless it is `main` or `master`, how long ago it was left
-  and the Status of its Session when one is open. Each section is a grid of `material-small` cards,
-  12 px, two across and three from a 1536 px window, filling its column. A card leads with what the
-  Session was doing – its title in `type-heading-16`, the last prompt under it in `type-copy-14`, two
-  lines each – then the Project's Drift strip with its active days, framed by the Project above and
-  the numbers below. A Session at work or waiting on you must not slip by: its card comes first in its
-  section and says *Busy* in a blue subtle Badge or *Waiting* on `alpha-200`; a quiet one keeps the
-  dot and the word. Open Project and Let Go sit in a `⋯` menu, and a Project's name on any Home
-  card opens its page, underlined under the pointer. A Loose End's and a Ready to Start card's
-  header ends with a tiny tertiary arrow (*Open Project* in its Hint), faint – `muted` at 50% –
-  until the pointer is over the card, then in `text`. The page's `h1` greets the account by its
-  first name (*Hello, Mehmet*), *Home* while there is none, 16 px above the band rather than the
-  column's 32.
-  Above the sections, a band of two 2×2 tiles on a four-column grid: the first Loose End leaves
-  its section for the left one – its section and age, the Session title in `type-heading-24`,
-  three lines of prompt, the Drift strip, its five most changed files (mono path, `+n −n` or *new*),
-  how many more and the last commit's subject, then the page's only primary Resume, the diff stat and
-  its Issue count – and **Focus** takes the right one: a row per Project in Focus, in the order
-  chosen, its 40 px Gauge, the 20 px avatar and the name (opens the page) in `type-label-14`, then
-  *5 of 9 days with Activity · since 1 Nov* in `muted`; *Nothing in Focus. Choose up to three on a
-  Project page.* when empty. No figure tiles: the counts live in the line under the greeting –
-  *3 Loose Ends – 1 from last night · 16 commits not pushed · 2 Sessions open.*, each part only
-  above zero. The other cards take a
-  secondary Resume. Under them, Ready to Start: a card per Project – its Issues newest first, each `#N`,
-  title and a tertiary Start on a row that takes `alpha-100` on hover – three per card until Show All, the Projects ordered by their newest
-  Issue. With no Loose End, Geist's Empty State says *Nothing left half-done.* above the five
-  Projects touched last, each with Resume.
-  Under 1280 px Home is that one column, without Needs You. From 1280 px it splits in two, 32 px
-  apart: the Loose Ends on the left – the title, the band and the sections – and a 360 px **right
-  column**, `sticky` 32 px from the top and no taller than the window, scrolling on its own when it
-  holds more, so it stays in view while the Loose Ends scroll. It holds **Needs You** – every open
-  Session waiting on you across the Projects, the longest first, in one `material-small` card: a row
-  per Session with the Project's 24 px avatar, its name in `type-label-13` `muted` over the Session's
-  title in `type-label-14`, and how long it has waited; the row takes `alpha-100` on hover and opens
-  the Project page, with no Resume, since the Session already runs. Under quieter `type-label-12`
-  labels, the same way, *Busy* – the Sessions at work – then *Quiet* – those gone quiet in the last
-  day, since one left overnight is quiet by the morning. When none waits, *No Session waits on you.*
-  stands in for the waiting rows and the heading drops its count; with no Session in any of the
-  three the block is not drawn. Under it Ready to Start, one card across. The Sessions Open tile
-  stays in the band: it counts, Needs You lists. Beside the right column a figure tile is narrower,
-  so in a tile under 224 px its part names take 72 px instead of 112 and leave the bars room.
+- **Home**, the first page (ADR 0001, ADR 0004), is the Board. It takes the window's height and
+  never scrolls itself: one header row, then the Board with the Shelf beside it, 24 px apart, each
+  scrolling on its own, so the Board stays a board. The header's left is the `h1`, greeting the
+  account by its first name (*Hello, Mehmet*), *Home* while there is none, over its line, which
+  carries the counts, each only above zero – *3 Loose Ends – 1 from last night · 16 commits not
+  pushed · 2 Sessions open · focuso waits on you · 25 min*, or *Nothing left half-done* – and names
+  the Session that has waited on you longest, since an open Session runs in its own window and is
+  never offered as Up Next.
+  **Up Next** is the header's right: a 56 px `material-small` row at 12 px, up to 720 px wide – the
+  word in `type-label-12` `muted`, the Project's 28 px avatar, the Session title or `#N title` in
+  `type-label-14` 500 over the Project's name (opens its page, underlined under the pointer) and the
+  reason in `muted` (*Left last night · 4 files · 2 unpushed* / *Pulled into Today 2 h ago* / *The
+  Project in Focus that drifted most · 1 of 3 days with Activity*), then the Enter Key and the
+  page's only primary button, a small Resume or Start. With nothing to pick up it says *Nothing to
+  pick up – pull a Note into Today.*
+  The **Board** is one `material-small` surface at 16 px with a dot grid on it – 1 px dots every
+  20 px in `line-strong`, fading out at the top and bottom – and inside it a grid of a 200 px head
+  column and three equal columns, Ready, Today, Doing, each named once above the first Lane in
+  `type-label-14` 500 with its count in `muted` and a `type-label-12` hint (*Nothing blocks them*,
+  *Pulled forward by you*, *A Session on it – Start or Resume*). A **Lane** is a row of that grid,
+  its top a dashed `line-strong` line, its cells parted by a solid `line`. The head is a strip of
+  tape – a 32 px `raised` bar with a 12 px swatch of the Lane's pad colour, the 20 px avatar and the
+  name – then the most pressing Status of its open Sessions as on a Loose End card, the Drift strip
+  with its active days, and the 28 px Focus Gauge with *of 9 days · since 1 Nov*. A cell is at least
+  224 px tall, 12 px of padding, its content wrapping with 12 px gaps; a cell under the pointer that
+  a Note of its Lane may land in takes the 2 px `accent` ring, any other cell nothing – no ring is
+  the "no". An empty cell holds a **Ghost**, a dashed 136 px square in `line-strong` with one
+  `type-label-12` sentence: *No Issue ready to Start*, *Pull a Note here*, *Drop a Note here to
+  Start it in a terminal*. With nothing in Focus the Board holds Geist's Empty State – *Nothing in
+  Focus.* – and the whole surface is the drop target.
+  A **Note** is an Issue: a 136 px square of paper (§ Colour, Paper) with a 2 px radius, leaning 1°
+  to 3° the way its number says, `#N` in 12 px mono `ink-2` over the title in `type-label-14` 500 on
+  three lines; under the pointer or the keyboard its last row shows a tertiary tiny Start and a
+  `⋯` menu – *Pull into Today* or *Take out of Today*, *Start*, *Open on GitHub*; in Doing *Take
+  out of Doing* and the moment it was Started. A blocked Issue is a grey Note in `ink-2` that says
+  *waits on 2 Issues* and offers only *Open on GitHub*. Ready holds the Issues ready to Start, the
+  most recently updated first, then the blocked ones; Today the Issues pulled, the first pulled
+  first; Doing the Issues Started from Undrift, the first Started first, after the Lane's **Cards**.
+  A Card is a Session: a 268 px white card at 3 px with the paper shadow, pinned by a 16 px head at
+  its top – black waits on you, blue works, hollow has gone quiet – and flagged *Left off · last
+  night* in a black 18 px tab at its top right when a Loose End was left in it. It carries the
+  Status and how long (*Waiting · 7 h · in a terminal*, or *Left 9 h ago*), the title in
+  `type-heading-16` on two lines, the last prompt in `type-copy-13` on two, then a small paper-grey
+  Open Project for an open Session – it runs, so no Resume – or Resume for an earlier one, with a
+  `⋯` of Open Project and Let Go when it is flagged.
+  Beside the Board, 232 px wide, the **Shelf**: a caption – *Shelf · 10* over *The ones that need
+  you first. Drag one onto the Board to work on it, a tape back here to stop.* – then one
+  `material-small` card at 12 px, 8 px of padding, scrolling on its own, of rows parted by the
+  edge colour: the 24 px avatar, the name in `type-label-13` 500 over one mark in
+  `type-label-12` – *Waiting · 25 min* with the black dot, *Busy* with the blue one, a filled
+  bookmark with *Left off · 3 days*, or the group dot alone – in that order, the one that needs you
+  sooner first; the row takes `alpha-100` under the pointer. A click opens the Project page; a drag
+  onto the Board puts the Project in Focus – the Board wears the 2 px `accent` ring while it has
+  room, four Lanes at most – and a Lane's tape dragged onto the Shelf takes it out, the Shelf's
+  card wearing the ring. Both travel as a copy fixed to the window, since the Board and the Shelf
+  clip what leaves them. The Lane's head also holds a `⋯`, shown under the pointer, with Open
+  Project, New Session and Put back on the Shelf.
+  A cell never holds two rows of paper: each Note or Card gets a column it may overflow, and the
+  columns shrink together when the cell is short of room, so the pieces overlap like paper on a
+  wall – the last laid down whole, the earlier ones peeking out from under it, and one brought out
+  under the pointer. The last column keeps its full width, so the last piece never crosses the
+  cell's edge.
 - **Projects**: the page's own rail of filters on the left, then every Project as Vercel's project
   card or as a row. The **rail** (§ Components) holds Groups – All, then In Motion, Drifting,
   Parked, each with its dot, then Loose Ends and Focus. One choice; All clears it. Each count says
@@ -144,10 +163,11 @@ window. A view is described here once it is built; until then this section holds
   for a load under 200 ms, and at least 300 ms once shown. The bridge reads in passes – the
   transcripts, git, then GitHub – and says with each list which it holds, so a page never states
   *nothing* about what is not read yet. Home, Projects and the Graph wait for the transcripts and
-  git: Home's band and a section of cards, Projects' rail and cards (or rows), the Graph's rail;
-  the network is drawn only once its Sessions are in. What comes from GitHub waits on its own: Ready
-  to Start is two cards of rows under its name, a Project page's Issues are rows in their card,
-  without a count, and its description is a line under the title. A Project page's Changes and Git
+  git: Home's Up Next row and a Board of two Lanes, Projects' rail and cards (or rows), the Graph's
+  rail; the network is drawn only once its Sessions are in. What comes from GitHub waits on its own:
+  each cell of the Board holds one 136 px Bar in a Note's place and the column heads drop their
+  counts – the Cards, which need no GitHub, are drawn – a Project page's Issues are rows in their
+  card, without a count, and its description is a line under the title. A Project page's Changes and Git
   wait for git. Until `gh api user` answers, the NavUser's menu holds two lines in Skeletons rather
   than *Not signed in*. The Skeleton in its place is the only sign that a pass runs: no spinner,
   nothing that turns for good.
@@ -196,6 +216,15 @@ backgrounds = `raised`, `muted-foreground` = `muted`, `border` = `line`, `ring` 
   Geist's gray-1000, as on the Vercel dashboard. Two deliberate departures from Geist, both for WCAG
   AA: `muted` is `#666666` (Geist's gray-700, `#8f8f8f`, is 3.2:1 on white), and blue text uses
   blue-900 (blue-700 is 4.3:1 on the page).
+- **Paper** is the one exception (ADR 0004): the Board's Notes are torn from a pad per Lane in
+  Focus order – `pad-1` `#fff59d` yellow, `pad-2` `#ffd3e3` pink, `pad-3` `#d6f1cc` green, `pad-4`
+  `#e6ddff` lavender – and a blocked Issue from `pad-off` `#e7e7e7`; the Cards are white. Paper keeps its own ink, `ink`
+  `#1c1c1c` and `ink-2` `#444444` (7.8:1 on pink, where `muted` would fall to 4.2:1), and the same
+  values in dark, because lit paper is the one place the theme does not reach. The colour is the
+  material, mapped to the Lane's place; it classifies nothing, and nothing else – no dot, no
+  Badge, no text – takes a colour from it. The `paper` utility draws a sheet: the pad in `--pad`, a
+  darker band on top where it was torn off, a faint SVG noise grain, and `--ud-shadow-paper`;
+  lifted, `--ud-shadow-paper-lifted`.
 - On a wide-gamut panel (`color-gamut: p3`), `accent`, `focus`, `accent-text` and `drifting` take
   Geist's own oklch values; every other panel keeps the hex above.
 - Selection is Geist's inversion: `text` behind, `raised` in front.
@@ -267,6 +296,14 @@ the information.
   `prefers-reduced-motion` the layout settles at once and nothing moves.
 - Edges are a 1 px spread shadow (`edge` utility, `0 0 0 1px var(--ud-line)`), not `border`; the
   header uses a one-sided shadow. A drop target being hovered gets a 2 px `accent` ring.
+- The Board's drag (Motion, `m.*` behind `LazyMotion` with `domMax`): a Note or a Shelf item
+  follows the pointer, straight and at 104%, on the lifted shadow, and stops catching the pointer
+  so the cell under it is what the drop reads. Dropped nowhere, or on a cell it may not take, it
+  springs back in about 200 ms; dropped on a cell it may take, it is drawn there at once and slides
+  from where it was released into its place over 300 ms, before the bridge's next list confirms
+  the move – a refusal springs it back with the toast. Nothing on the Board moves on its own, and
+  under `prefers-reduced-motion` (`MotionConfig reducedMotion="user"`) a drag still follows the
+  pointer but nothing slides or springs.
 - Cards wear Geist's material-small, as the Vercel dashboard's cards do: the `material-small` utility
   in `index.css` – `surface` behind `--ud-shadow-small`, the edge plus a small drop – with the radius
   as its own class, since cards come in 6 and 12 px. A hovered Project card lays a `line-strong` ring
@@ -275,7 +312,8 @@ the information.
   Geist's other materials, each starting with the same edge.
 - Radius, fixed steps rather than multiples of `--radius`: 4 px `rounded-sm` · 6 px `rounded-md` for
   buttons, rows, the header's tabs, Project avatars, and the Project cards and list cards (the Projects grid), as on Vercel's dashboard · 8 px `rounded-lg` · 12 px `rounded-xl` for
-  Panels, the Project page's cards, Home's cards, dialogs and menus · 2 px for strip cells · full for dots and
+  Panels, the Project page's cards, Home's Up Next row, dialogs and menus · 16 px for the Board · 2 px for strip
+  cells and a Note, 3 px for a Card – paper is cut, not rounded · full for dots and
   the NavUser's avatar, a person rather than a Project, as on Vercel.
 - Spacing on the 4 px grid. Separation by space and surface, not divider lines.
 - Overlays move as Geist's: Find scales in from 96% over 300 ms on Geist's swift curve,
@@ -293,7 +331,9 @@ the information.
 ## Keyboard
 
 `F` or `Ctrl K` opens Find · `/` jumps to the Projects search · `Esc` closes Find · `R` or `Ctrl R`
-asks the bridge to read everything again, and a toast says *Refreshed.* once it has · `Ctrl Q` quits.
+asks the bridge to read everything again, and a toast says *Refreshed.* once it has · `Enter` on
+Home, with nothing focused, does what Up Next names – a focused button or menu keeps its own Enter ·
+`Ctrl Q` quits. A drag is for the pointer; the keyboard moves a Note through its `⋯` menu.
 Focus is Geist's double ring: `0 0 0 2px` `surface` (background-100), then `0 0 0 4px` `focus`; text
 fields show focus with their caret and frame instead. That frame is `--ud-focus-border`, Geist's field
 halo (a gray-alpha-600 edge in a 4 px halo), and it stays while the pointer is over the field. Segmented
@@ -352,6 +392,12 @@ The logo comes from `art/` – never redrawn, never retyped; in the interface it
 - **Empty State** (`Empty`) is Geist's: 48 px vertical padding and 24 px gaps, the icon in an 8 px
   radius box with 10 px padding and an edge, an optional `type-heading-16` title (an `h3`), a sentence
   of at most 340 px balanced over its lines, then an optional action.
+- **Note**, **Card** and **Ghost** (`note.tsx`) are the Board's material (§ Layout, Home; § Colour,
+  Paper). A Note's controls sit on paper, so they keep their own greys – a tertiary tiny Start and
+  the `⋯` trigger in `ink`, `#0000001a` under the pointer – and show only under the pointer or the
+  keyboard (`group-hover`, `group-focus-within`); a Card's buttons are paper-grey secondaries
+  (`#e4e4e4` edge, `#f2f2f2` hover), since the primary button turns light in dark mode. The
+  menus are the generated DropdownMenu as everywhere else.
 - **Toast** (`src/components/toast.tsx`, on Base UI's Toast) is Geist's: a 420 px `surface` card,
   12 px radius, 16 px padding, `type-copy-14`, `--ud-shadow-menu`, stacked in the bottom-right
   corner with the newest nearest it. It leaves after 3.5 s (an Undo after 5 s); hovering or focusing

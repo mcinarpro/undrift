@@ -19,6 +19,31 @@ fn project(shared: &bridge::Shared, path: &str) -> Result<bridge::Project, Strin
     latest.projects.iter().flatten().find(|p| p.path == path).cloned().ok_or_else(|| format!("not a Project: {path}"))
 }
 
+/// An open Issue of the Project the window names, from the bridge's own list, with its Project.
+fn issue(shared: &bridge::Shared, path: &str, number: u32) -> Result<(bridge::Project, bridge::issues::Issue), String> {
+    let project = project(shared, path)?;
+    let issue = project.issues.iter().find(|i| i.number == number).cloned().ok_or_else(|| format!("not an open Issue of {path}: #{number}"))?;
+    Ok((project, issue))
+}
+
+/// Takes out of Today and of the Starts every Issue the list knows to be closed: its repository
+/// has open Issues on record and this one is not among them. A repository `gh` could not read has
+/// none on record, so its intentions are kept. Housekeeping after a write Mehmet asked for, so a
+/// failure here is logged and never fails his action.
+fn prune(shared: &bridge::Shared) {
+    let projects = shared.lock().ok().and_then(|l| l.projects.clone()).unwrap_or_default();
+    let dead = |url: &str| {
+        let Some(repo) = bridge::issues::repo_of(url) else { return false };
+        projects.iter().any(|p| p.repo.as_ref().is_some_and(|r| r.github.as_deref() == Some(repo.as_str())) && !p.issues.is_empty() && !p.issues.iter().any(|i| i.url == url))
+    };
+    if let Err(e) = bridge::config::prune_today(&dead) {
+        eprintln!("today: {e}");
+    }
+    if let Err(e) = bridge::started::prune(&dead) {
+        eprintln!("started: {e}");
+    }
+}
+
 /// The terminal `config.json` names, read fresh at each click: the file is small and a click is
 /// rare, so the bridge keeps no copy of it for the commands.
 fn terminal_setting() -> String {
@@ -41,17 +66,44 @@ async fn new_session(shared: tauri::State<'_, bridge::Shared>, path: String) -> 
 }
 
 /// Start: a terminal in the Project's folder running `claude` with the Issue as its first prompt.
+/// The Start is recorded once the terminal is open, so a launch that fails puts nothing in Doing;
+/// the next tick rereads the Starts and sends the list again.
 #[tauri::command]
 async fn start(shared: tauri::State<'_, bridge::Shared>, path: String, number: u32) -> Result<(), String> {
-    let project = project(&shared, &path)?;
-    let Some(issue) = project.issues.iter().find(|i| i.number == number) else {
-        return Err(format!("not an open Issue of {path}: #{number}"));
-    };
+    let (project, issue) = issue(&shared, &path, number)?;
     // The window never offers a blocked Issue; the bridge guards it anyway.
     if issue.blocked_by > 0 {
         return Err(format!("#{number} is blocked by an open Issue"));
     }
-    terminal::start(&project.path, &terminal_setting(), number)
+    terminal::start(&project.path, &terminal_setting(), number)?;
+    bridge::started::stamp(&issue.url, &chrono::Local::now().to_rfc3339()).map_err(|e| e.to_string())?;
+    prune(&shared);
+    rebuild(&shared);
+    Ok(())
+}
+
+/// Take out of Doing: forgets the Start of the Issue, so its Note goes back to Ready or Today. The
+/// Session it opened runs on; only the Board's record of the Issue changes.
+#[tauri::command]
+async fn forget_start(shared: tauri::State<'_, bridge::Shared>, path: String, number: u32) -> Result<(), String> {
+    let (_, issue) = issue(&shared, &path, number)?;
+    bridge::started::forget(&issue.url).map_err(|e| e.to_string())?;
+    rebuild(&shared);
+    Ok(())
+}
+
+/// Today: pulls the Issue into Today now, or takes it out (GLOSSARY.md § Today). The config file's
+/// mtime does the rebuild, as for Focus.
+#[tauri::command]
+async fn set_today(shared: tauri::State<'_, bridge::Shared>, path: String, number: u32, on: bool) -> Result<(), String> {
+    let (_, issue) = issue(&shared, &path, number)?;
+    if on && issue.blocked_by > 0 {
+        return Err(format!("#{number} is blocked by an open Issue"));
+    }
+    let since = on.then(|| chrono::Local::now().to_rfc3339());
+    bridge::config::set_today(&issue.url, since.as_deref()).map_err(|e| e.to_string())?;
+    prune(&shared);
+    Ok(())
 }
 
 /// Let Go: takes the Loose End off Home until the Project's next Activity. The next tick rereads
@@ -129,7 +181,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![projects_now, resume, new_session, start, let_go, undo_let_go, set_focus, rescan, nav_user, nav_user_avatar, quit])
+        .invoke_handler(tauri::generate_handler![projects_now, resume, new_session, start, forget_start, set_today, let_go, undo_let_go, set_focus, rescan, nav_user, nav_user_avatar, quit])
         .setup(|app| {
             bridge::start(app.handle().clone());
             tray(app)?;

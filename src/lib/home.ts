@@ -1,8 +1,9 @@
 import { focusDrift } from "@/lib/projects";
-import type { FileChange, Issue, OpenSession, Project, Session } from "@/types";
+import type { FileChange, OpenSession, Project, Session } from "@/types";
 
-// What Home shows, worked out from the bridge's Projects. The bridge decides which Projects are
-// Loose Ends (GLOSSARY.md § Loose End); the window decides how they read on its own clock.
+// What Home reads from the bridge's Projects – the Loose Ends, Focus, the Sessions that need you –
+// on the window's own clock; the Board itself is worked out in lib/board.ts from these. The
+// bridge decides which Projects are Loose Ends (GLOSSARY.md § Loose End).
 
 export type Section = "Last Night" | "This Week" | "Older";
 const SECTIONS: Section[] = ["Last Night", "This Week", "Older"];
@@ -120,31 +121,6 @@ export function driftCells(activeDays: string[], now: Date): boolean[] {
   return Array.from({ length: 30 }, (_, i) => days.has(dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - (29 - i)))));
 }
 
-/** Every Issue ready to Start grouped by its Project – an open Issue with no open blocker – each
- * Project's Issues the most recently updated first, the Projects ordered by their newest Issue.
- * Two checkouts of one repository share its Issues, so each Issue is listed once, with the first
- * Project that has it. */
-export function issuesByProject(projects: Project[]): { project: Project; issues: Issue[] }[] {
-  const seen = new Set<string>();
-  return projects
-    .map((project) => ({
-      project,
-      issues: project.issues
-        .filter((i) => i.blockedBy === 0 && !seen.has(i.url) && seen.add(i.url))
-        .sort((a, b) => time(b.updatedAt) - time(a.updatedAt)),
-    }))
-    .filter((g) => g.issues.length > 0)
-    .sort((a, b) => time(b.issues[0].updatedAt) - time(a.issues[0].updatedAt));
-}
-
-/** The five Projects touched last that have a Session to Resume, for the Empty State. */
-export function touchedLast(projects: Project[]): { project: Project; session: Session }[] {
-  return projects
-    .flatMap((project) => (project.sessions[0] ? [{ project, session: project.sessions[0] }] : []))
-    .sort((a, b) => time(b.session.lastActivity) - time(a.session.lastActivity))
-    .slice(0, 5);
-}
-
 /** Geist's relative time: Just now, 5 min. ago, 3 h ago, 2 days ago, then the date. */
 export function age(iso: string, now: Date): string {
   const ms = now.getTime() - time(iso);
@@ -155,6 +131,10 @@ export function age(iso: string, now: Date): string {
   if (days < 30) return days === 1 ? "1 day ago" : `${days} days ago`;
   return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
+
+/** How long something has been so – *7 h*, *3 days* – the relative time without its *ago*, for
+ * a Status that still holds: *Waiting · 7 h*. */
+export const elapsed = (iso: string, now: Date) => age(iso, now).replace(/ ago$/, "");
 
 /** A changed file's lines as a list shows them: `+n −n`, *new* for an untracked file, *binary*
  * for a tracked one git cannot count. */

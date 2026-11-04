@@ -22,6 +22,19 @@ pub struct Issue {
     /// The open Issues blocking it, as GitHub's dependencies say: ready to Start at 0. The only
     /// thing kept of the dependencies – which Issues they are stays on GitHub.
     pub blocked_by: u32,
+    /// RFC 3339 of the moment it was pulled into Today (GLOSSARY.md § Today); `None` otherwise.
+    /// Undrift's own, set at build time from `config.json`, never from GitHub.
+    pub today_since: Option<String>,
+    /// RFC 3339 of the moment it was Started from Undrift; `None` otherwise. Undrift's own, set at
+    /// build time from `started.json`.
+    pub started_at: Option<String>,
+}
+
+/// The `owner/name` an Issue URL belongs to, so a stored URL can be checked against the open
+/// Issues the bridge read for that repository.
+pub fn repo_of(url: &str) -> Option<String> {
+    let mut parts = url.strip_prefix("https://github.com/")?.splitn(3, '/');
+    Some(format!("{}/{}", parts.next()?, parts.next()?))
 }
 
 /// One Issue as the REST API lists it. The endpoint also lists pull requests, told apart by their
@@ -91,6 +104,8 @@ fn parse(json: &str) -> Option<Vec<Issue>> {
                 updated_at: l.updated_at,
                 url: l.html_url,
                 blocked_by: l.issue_dependencies_summary.unwrap_or_default().blocked_by,
+                today_since: None,
+                started_at: None,
             })
             .collect(),
     )
@@ -111,6 +126,13 @@ mod tests {
         assert_eq!(issues[0].updated_at, "2026-11-02T20:26:12Z");
         assert_eq!(issues[0].url, "https://github.com/mcinarpro/undrift/issues/4");
         assert_eq!(issues[0].blocked_by, 2);
+    }
+
+    #[test]
+    fn the_repository_of_an_issue_url_is_its_owner_and_name() {
+        assert_eq!(repo_of("https://github.com/mcinarpro/undrift/issues/4").as_deref(), Some("mcinarpro/undrift"));
+        assert_eq!(repo_of("https://gitlab.com/o/r/issues/4"), None);
+        assert_eq!(repo_of("https://github.com/mcinarpro"), None);
     }
 
     #[test]

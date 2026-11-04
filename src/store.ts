@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import * as bridge from "@/bridge";
 import { failed, toasts } from "@/components/toast";
+import { upNext } from "@/lib/board";
 import { SORTS, type GroupFilter, type Sort } from "@/lib/projects";
 import { savedTheme, setTheme, type ThemeChoice } from "@/lib/theme";
 import type { NavUser, Project, Read } from "@/types";
@@ -65,11 +66,20 @@ type State = {
   quit: () => void;
   resume: (path: string, sessionId: string) => void;
   newSession: (path: string) => void;
-  start: (path: string, issue: number) => void;
+  /** The Board moves a Note before the bridge answers, so these say whether it did: false means
+   * the Note goes back, and the toast has already said why. */
+  start: (path: string, issue: number) => Promise<boolean>;
+  setToday: (path: string, issue: number, on: boolean) => Promise<boolean>;
+  forgetStart: (path: string, issue: number) => Promise<boolean>;
+  /** What Enter does on Home: Resume or Start the one thing Up Next names. */
+  pickUpNext: () => void;
   letGo: (path: string, name: string) => void;
   setFocus: (path: string, on: boolean) => void;
   refresh: () => void;
 };
+
+/** A bridge call as a yes or no: the toast says why on a no. */
+const did = (call: Promise<void>, what: string) => call.then(() => true, (e: unknown) => (failed(what, e), false));
 
 export const useStore = create<State>((set, get) => ({
   page: "home",
@@ -113,7 +123,15 @@ export const useStore = create<State>((set, get) => ({
   },
   resume: (path, sessionId) => void bridge.resume(path, sessionId).catch((e) => failed("resume the Session", e)),
   newSession: (path) => void bridge.newSession(path).catch((e) => failed("open a new Session", e)),
-  start: (path, issue) => void bridge.start(path, issue).catch((e) => failed("start the Issue", e)),
+  start: (path, issue) => did(bridge.start(path, issue), "start the Issue"),
+  setToday: (path, issue, on) => did(bridge.setToday(path, issue, on), on ? "pull the Issue into Today" : "take the Issue out of Today"),
+  forgetStart: (path, issue) => did(bridge.forgetStart(path, issue), "take the Issue out of Doing"),
+  pickUpNext: () => {
+    const next = upNext(get().projects ?? [], new Date());
+    if (!next) return;
+    if (next.kind === "resume") get().resume(next.project.path, next.session.id);
+    else void get().start(next.project.path, next.issue.number);
+  },
   // The Loose End leaves Home with the list the bridge sends back. Let Go takes one click, so the
   // toast says what it did and offers Undo for 5 s (DESIGN.md § Components, Toast).
   letGo: (path, name) =>
@@ -131,7 +149,7 @@ export const useStore = create<State>((set, get) => ({
       )
       .catch((e) => failed("let go of the Loose End", e)),
   // The Badge and the rails follow with the list the bridge sends back on its next tick.
-  // A fourth Project is refused by the bridge, whose words – three at most – reach the toast.
+  // A fifth Project is refused by the bridge, whose words – four at most – reach the toast.
   setFocus: (path, on) => void bridge.setFocus(path, on).catch((e) => failed(on ? "put the Project in Focus" : "take the Project out of Focus", e)),
 }));
 

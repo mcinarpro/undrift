@@ -1,8 +1,9 @@
 # AGENTS.md
 
-Undrift is a desktop cockpit for getting back into work left half-done: it opens on the Loose Ends –
-Projects where a Session ran after the last commit and left changes behind – then the GitHub Issues
-ready to Start, and resumes or starts one in a click. Tauri v2 bridge in Rust, Vite + React window. Linux and Windows.
+Undrift is a desktop cockpit for getting back into work left half-done: it opens on the Board – a
+Lane per Project in Focus, its GitHub Issues as Notes in Ready, Today and Doing, its Sessions as
+Cards, a Loose End (a Session that ran after the last commit and left changes behind) flagged on its
+Card – and resumes or starts the one thing Up Next names in a click. Tauri v2 bridge in Rust, Vite + React window. Linux and Windows.
 
 ## Start here
 

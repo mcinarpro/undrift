@@ -1,6 +1,7 @@
 import {
   ArrowUpDown,
   ArrowUpRight,
+  Bookmark,
   Bot,
   ChevronDown,
   Ellipsis,
@@ -51,6 +52,8 @@ const ICONS = {
   close: X,
   resume: Play,
   start: SquareTerminal,
+  // The Loose End's mark on the Board: the bookmark left in a folder where work stopped.
+  leftOff: Bookmark,
   more: Ellipsis,
   branch: GitBranch,
   commit: GitCommitHorizontal,

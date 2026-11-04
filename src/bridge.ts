@@ -59,6 +59,10 @@ export async function watchProjects(onSnapshot: (snapshot: Snapshot) => void): P
 export const resume = (path: string, id: string) => (inTauri ? invoke<void>("resume", { path, id }) : Promise.resolve());
 export const newSession = (path: string) => (inTauri ? invoke<void>("new_session", { path }) : Promise.resolve());
 export const start = (path: string, number: number) => (inTauri ? invoke<void>("start", { path, number }) : Promise.resolve());
+/** Takes the Issue out of Doing: the bridge forgets its Start, the Session it opened runs on. */
+export const forgetStart = (path: string, number: number) => (inTauri ? invoke<void>("forget_start", { path, number }) : Promise.resolve());
+/** Pulls the Issue into Today, or takes it out; the bridge refuses a blocked one. */
+export const setToday = (path: string, number: number, on: boolean) => (inTauri ? invoke<void>("set_today", { path, number, on }) : Promise.resolve());
 export const letGo = (path: string) => (inTauri ? invoke<void>("let_go", { path }) : Promise.resolve());
 export const undoLetGo = (path: string) => (inTauri ? invoke<void>("undo_let_go", { path }) : Promise.resolve());
 /** Puts the Project in Focus, or takes it out; the bridge refuses a fourth. */

@@ -72,6 +72,10 @@ export type Issue = {
   url: string;
   /** The open Issues blocking it, as GitHub's dependencies say: ready to Start at 0. */
   blockedBy: number;
+  /** ISO timestamp of the moment it was pulled into Today; null otherwise. Undrift's own. */
+  todaySince: string | null;
+  /** ISO timestamp of the moment it was Started from Undrift; null otherwise. Undrift's own. */
+  startedAt: string | null;
 };
 
 /** Reads First: the size of what a Session loads at start, and the files counted. */
