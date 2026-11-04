@@ -534,7 +534,7 @@ export function Home() {
     .join(" · ");
   const next = projects ? upNext(projects, now) : null;
   const items = projects ? shelf(projects, now) : [];
-  const count = (c: Column) => all.reduce((n, l) => n + (c === "ready" ? l.ready.filter((i) => i.blockedBy === 0).length : c === "doing" ? l.doing.length + l.cards.length : l[c].length), 0);
+  const count = (c: Column) => all.reduce((n, l) => n + (c === "ready" ? l.ready.filter((i) => i.blockedBy === 0).length : c === "doing" ? l.doing.length + l.cards.length : c === "done" ? l.project.closed.length : l[c].length), 0);
   // A folder may land on the Board while it has room; a tape may land on the Shelf.
   const boardRing = dragging?.kind === "project" && over === "board" && all.length < MAX_LANES;
   const shelfRing = dragging?.kind === "lane" && over === "shelf";

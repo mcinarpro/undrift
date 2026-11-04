@@ -73,8 +73,8 @@ until the Issue closes or Mehmet takes them out.
 _Avoid_: In progress, WIP
 
 **Done**:
-The Board's last column: the Issues closed on GitHub in the last 7 days, faded, leaving on their
-own. Nothing is dragged into or out of it – closing the Issue on GitHub is what moves a Note there.
+The Board's last column: the last three Issues closed on GitHub in the last 7 days, faded, leaving
+on their own – the head counts them all. Nothing is dragged into or out of it – closing the Issue on GitHub is what moves a Note there.
 _Avoid_: Finished, archive, history
 
 **Card**:

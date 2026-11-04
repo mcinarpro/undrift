@@ -78,9 +78,11 @@ export type Lane = {
   /** The Issues Started from Undrift whose Session has no Card – it is not open and left no
    * Loose End – the first Started first. */
   doing: Issue[];
-  /** The Issues closed on GitHub this week, the last closed first. */
+  /** The last three Issues closed on GitHub this week, the last closed first: a sign of motion,
+   * not a pile – the column's head counts them all. */
   done: Issue[];
-  /** The open Sessions, the ones waiting on you first, then the Loose End's earlier Session. */
+  /** The Loose End's earlier Session, then the open Sessions, the one waiting on you last: the
+   * cell lays its pieces left to right with the last one whole, so the most pressing is on top. */
   cards: Card[];
 };
 
@@ -105,9 +107,9 @@ function cardsOf(project: Project, now: Date, started: Issue[]): Card[] {
         issue: issueOf(open.id),
       };
     })
-    .sort((a, b) => STATUS_RANK[a.status!] - STATUS_RANK[b.status!] || at(a.since) - at(b.since));
+    .sort((a, b) => STATUS_RANK[b.status!] - STATUS_RANK[a.status!] || at(b.since) - at(a.since));
   if (left && !project.openSessions.some((o) => o.id === left.id)) {
-    cards.push({
+    cards.unshift({
       id: left.id,
       title: left.title,
       lastPrompt: left.lastPrompt,
@@ -142,7 +144,7 @@ export function lanes(projects: Project[], now: Date, flight?: Record<string, Co
       ready: column("ready").sort((a, b) => Number(a.blockedBy > 0) - Number(b.blockedBy > 0) || newest(a, b)),
       today: column("today").sort((a, b) => at(a.todaySince) - at(b.todaySince)),
       doing: started.filter((issue) => !cards.some((c) => c.issue === issue)),
-      done: [...project.closed].sort((a, b) => at(b.closedAt) - at(a.closedAt)),
+      done: [...project.closed].sort((a, b) => at(b.closedAt) - at(a.closedAt)).slice(0, 3),
       cards,
     };
   });

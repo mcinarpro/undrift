@@ -73,8 +73,10 @@ window. A view is described here once it is built; until then this section holds
   most recently updated first, then the blocked ones; Today the Issues pulled, the first pulled
   first; Doing the Lane's **Cards**, each with the Note it was Started from under its bottom-right
   corner – behind the Card, out under the pointer – then the Started Notes whose Session is gone;
-  Done the Issues closed on GitHub this week, the last closed first, which GitHub alone fills and
-  empties.
+  Done the last three Issues closed on GitHub this week, the last closed first – a sign of motion,
+  not a pile; the head counts them all – which GitHub alone fills and empties. The Cards lie with
+  the most pressing Session on top: the cell lays its pieces left to right with the last one whole,
+  so the earlier Session of a Loose End comes first and the one waiting on you last.
   A Card is a Session: a 268 px white card at 3 px with the paper shadow, pinned by a 16 px head at
   its top left – black waits on you, blue works, hollow has gone quiet – and flagged *Left off ·
   last night* in a black 18 px tab at its top right when a Loose End was left in it. It carries the
