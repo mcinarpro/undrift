@@ -66,6 +66,15 @@ async fn new_session(shared: tauri::State<'_, bridge::Shared>, path: String) -> 
     terminal::new_session(&project.path, &terminal_setting())
 }
 
+/// Fix the checks: a terminal in the Project's folder running `claude` on one of its open pull
+/// requests, from the bridge's own list, so the window cannot name one the repository has not.
+#[tauri::command]
+async fn fix_checks(shared: tauri::State<'_, bridge::Shared>, path: String, number: u32) -> Result<(), String> {
+    let project = project(&shared, &path)?;
+    let pull = project.pulls.iter().find(|p| p.number == number).ok_or_else(|| format!("not an open pull request of {path}: #{number}"))?;
+    terminal::fix_checks(&project.path, &terminal_setting(), pull.number)
+}
+
 /// Start: a terminal in the Project's folder running `claude` with the Issue as its first prompt.
 /// The Start is recorded once the terminal is open, so a launch that fails puts nothing in Doing;
 /// the next tick rereads the Starts and sends the list again.
@@ -184,7 +193,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![projects_now, resume, new_session, start, forget_start, set_today, let_go, undo_let_go, set_focus, rescan, nav_user, nav_user_avatar, quit])
+        .invoke_handler(tauri::generate_handler![projects_now, resume, new_session, fix_checks, start, forget_start, set_today, let_go, undo_let_go, set_focus, rescan, nav_user, nav_user_avatar, quit])
         .setup(|app| {
             bridge::start(app.handle().clone());
             tray(app)?;

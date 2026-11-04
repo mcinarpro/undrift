@@ -18,7 +18,7 @@ pub mod user;
 use chrono::{DateTime, FixedOffset, Local};
 use config::{project_for, Config, Settings};
 use history::{Record, SessionMeta};
-use issues::Issue;
+use issues::{Issue, Pull};
 use reads_first::ReadsFirst;
 use repo::{Repo, RepoRead};
 use serde::Serialize;
@@ -112,6 +112,8 @@ pub struct Project {
     /// The Issues of its GitHub repository closed in the last week, the Board's Done; empty
     /// without one. Apart, so the pages that count open Issues keep counting them.
     pub closed: Vec<Issue>,
+    /// Open pull requests of its GitHub repository, newest first; empty without one.
+    pub pulls: Vec<Pull>,
     /// Whether Home lists it (GLOSSARY.md § Loose End), Let Go already applied.
     pub loose_end: bool,
     /// What every Session reads before its first prompt; `None` when the folder has nothing.
@@ -246,6 +248,7 @@ struct GitHubRead {
     issues: Option<Vec<Issue>>,
     /// The Issues closed in the last `DONE_DAYS`, for the Board's Done column.
     closed: Option<Vec<Issue>>,
+    pulls: Option<Vec<Pull>>,
     description: Option<Option<String>>,
 }
 
@@ -265,6 +268,8 @@ struct Known {
     issues: HashMap<String, Vec<Issue>>,
     /// The Issues closed in the last `DONE_DAYS`, by `owner/name`.
     closed: HashMap<String, Vec<Issue>>,
+    /// Open pull requests by `owner/name`.
+    pulls: HashMap<String, Vec<Pull>>,
     /// Repository descriptions by `owner/name`; `None` for a repository without one.
     descriptions: HashMap<String, Option<String>>,
     let_go: let_go::LetGo,
@@ -327,6 +332,7 @@ impl Known {
                     i.session_id = start.map(|s| s.session.clone());
                 }
                 let closed = read.and_then(|r| r.repo.github.as_ref()).and_then(|g| self.closed.get(g)).cloned().unwrap_or_default();
+                let pulls = read.and_then(|r| r.repo.github.as_ref()).and_then(|g| self.pulls.get(g)).cloned().unwrap_or_default();
                 let path_text = path.to_string_lossy().into_owned();
                 let last_session = records.first().map(|r| r.meta.last_activity.as_str());
                 let loose_end = loose_end(read, last_session, last_activity.as_deref(), self.let_go.get(&path_text).map(String::as_str));
@@ -344,6 +350,7 @@ impl Known {
                     sessions: records.iter().take(MAX_SESSIONS).map(|r| view(r.cwd.clone(), &r.meta)).collect(),
                     issues,
                     closed,
+                    pulls,
                     loose_end,
                     reads_first: self.reads_first.get(&path).cloned(),
                     path: path_text,
@@ -514,7 +521,7 @@ fn run(app: AppHandle, shared: Shared) {
         github_scan.run(n % GITHUB_EVERY_TICKS == 0 || github_changed, asked, move || {
             let list: Vec<&String> = repos.iter().collect();
             let since = (chrono::Utc::now() - chrono::Duration::days(DONE_DAYS)).to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-            let found = in_parallel(&list, GH_WORKERS, |r| GitHubRead { issues: issues::list(r), closed: issues::closed(r, &since), description: issues::description(r), repo: (*r).clone() });
+            let found = in_parallel(&list, GH_WORKERS, |r| GitHubRead { issues: issues::list(r), closed: issues::closed(r, &since), pulls: issues::pulls(r), description: issues::description(r), repo: (*r).clone() });
             (repos, found)
         });
         if let Some(((covered, found), was_asked)) = github_scan.poll() {
@@ -527,12 +534,16 @@ fn run(app: AppHandle, shared: Shared) {
                 if let Some(c) = f.closed {
                     known.closed.insert(f.repo.clone(), c);
                 }
+                if let Some(p) = f.pulls {
+                    known.pulls.insert(f.repo.clone(), p);
+                }
                 if let Some(d) = f.description {
                     known.descriptions.insert(f.repo, d);
                 }
             }
             known.issues.retain(|r, _| github.contains(r));
             known.closed.retain(|r, _| github.contains(r));
+            known.pulls.retain(|r, _| github.contains(r));
             known.descriptions.retain(|r, _| github.contains(r));
             dirty = true;
             answer |= was_asked;

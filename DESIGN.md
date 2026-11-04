@@ -52,8 +52,12 @@ window. A view is described here once it is built; until then this section holds
   `muted` and nothing else: the Ghosts say what a column takes. A **Lane** is a row of that grid, its top a
   dashed `line-strong` line, its cells parted by a solid `line`. The head is a strip of tape – a
   32 px `raised` bar with a 12 px swatch of the Lane's pad colour, the 20 px avatar and the name –
-  then the most pressing Status of its open Sessions as on a Loose End card, and the 28 px Focus
-  Gauge with *of 9 days · since 1 Nov*, the Lane's one instrument, since Focus is what the Board
+  then the most pressing Status of its open Sessions as on a Loose End card, then the pull request
+  that needs you most – *PR #44 · checks failing* with the `error-fill` dot, *checks pending* with
+  the `mark` dot, *ready to merge* with the ink dot, *open* or *draft* hollow – a `type-label-12`
+  link that opens it on GitHub, with the bots' ones counted under it, *2 deps PRs*; the Lane's `⋯`
+  offers *Fix the checks of #44* while they fail, a terminal running `claude` on them. Then the
+  28 px Focus Gauge with *of 9 days · since 1 Nov*, the Lane's one instrument, since Focus is what the Board
   measures – the Drift strip stays on the Project's page. A cell is at least 224 px tall, 12 px of
   padding, its content wrapping with 12 px gaps; a cell under the pointer that a Note of its Lane
   may land in takes the 2 px `accent` ring, any other cell nothing – no ring is the "no". At rest

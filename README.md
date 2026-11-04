@@ -33,7 +33,7 @@ look wrong without their reason are in [docs/adr/](docs/adr/).
 | `~/.claude/sessions/<pid>.json` | the open Sessions: id, folder, busy or waiting |
 | `~/.claude/projects/<slug>/<sessionId>.jsonl` | when each turn happened, the title and last-prompt lines Claude Code writes for its own resume picker, and the last line of Claude's last reply (200 characters at most) – never the prompt text, the rest of a reply, file contents or tool output |
 | `git` in each Project folder (`rev-parse`, `log`, `status`, `diff`, `remote`) | the branch, the last commit, what is changed and what is unpushed, the days with a commit, the `origin` URL |
-| `gh api repos/…/issues`, `gh repo view`, `gh api user` | the open Issues and the ones closed this week, the repository's description, the account and its avatar |
+| `gh api repos/…/issues`, `gh pr list`, `gh repo view`, `gh api user` | the open Issues and the ones closed this week, the open pull requests with the state of their checks, the repository's description, the account and its avatar |
 
 Projects are discovered: every git root directly under `~/workspace`, plus every folder a Session
 ran in. Undrift's own state lives in `~/.config/undrift/config.json` (roots, Hides, Focus, Today,

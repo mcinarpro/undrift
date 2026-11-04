@@ -10,6 +10,17 @@ pub fn start_prompt(issue: u32) -> String {
     format!("/mattpocock-skills:implement #{issue}")
 }
 
+/// The first prompt Fix the checks gives a Session: the pull request's failing checks, to read
+/// and to fix on its branch. No `;` in it – the Windows launcher splits on it.
+pub fn fix_checks_prompt(pull: u32) -> String {
+    format!("The checks of pull request #{pull} fail. Check out its branch with gh pr checkout {pull} if it is not the current one, read what fails with gh pr checks {pull} and gh run view --log-failed, fix the cause, and show me the diff before any commit.")
+}
+
+/// Fix the checks: a terminal in the Project's folder running `claude` on the pull request.
+pub fn fix_checks(cwd: &str, terminal: &str, pull: u32) -> Result<(), String> {
+    open(cwd, terminal, &[&fix_checks_prompt(pull)])
+}
+
 pub fn resume(cwd: &str, terminal: &str, session_id: &str) -> Result<(), String> {
     // The id reaches `claude` as an argument, never through the shell, but anything other than a
     // session id has no business there.

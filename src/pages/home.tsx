@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { m, useMotionValue, type MotionValue } from "motion/react";
+import { openExternal } from "@/bridge";
 import { Action } from "@/components/action";
 import { Empty, Gauge, GroupDot, Key, ProjectAvatar, STATUS_DOT, StatusMark, useNow } from "@/components/bits";
 import { Icon } from "@/components/icon";
@@ -11,7 +12,7 @@ import { elapsed, headline, looseEnds, needsYou, type StatusName } from "@/lib/h
 import { openStatuses } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/store";
-import type { Issue, Project } from "@/types";
+import type { Checks, Issue, Project, Pull } from "@/types";
 
 // Home is the Board (ADR 0004, DESIGN.md § Layout): one line that names the thing to pick up, then
 // a Lane per Project in Focus with its Issues as Notes in three columns – Ready, Today, Doing – and
@@ -125,6 +126,19 @@ function pressing(project: Project, now: Date): { status: StatusName; count: num
   return (["Waiting", "Busy", "Quiet"] as StatusName[]).map((s) => all.find((x) => x.status === s)).find(Boolean);
 }
 
+/** The pull request a Lane names, the one that needs you most: failing checks, then pending, then
+ * ready to merge, then open or a draft – never a bot's, which the Lane counts instead. */
+const CHECK_RANK: Record<Checks, number> = { failing: 0, pending: 1, passing: 2, none: 3 };
+const PULL_WORD: Record<Checks, string> = { failing: "checks failing", pending: "checks pending", passing: "ready to merge", none: "open" };
+const PULL_DOT: Record<Checks, string> = { failing: "bg-error-fill", pending: "bg-mark", passing: "bg-foreground", none: STATUS_DOT.Quiet };
+
+function pullMark(pulls: Pull[]): { pull: Pull; word: string; dot: string } | null {
+  const own = pulls.filter((p) => !p.bot).sort((a, b) => Number(a.draft) - Number(b.draft) || CHECK_RANK[a.checks] - CHECK_RANK[b.checks]);
+  const pull = own[0];
+  if (!pull) return null;
+  return { pull, word: pull.draft ? "draft" : PULL_WORD[pull.checks], dot: pull.draft ? STATUS_DOT.Quiet : PULL_DOT[pull.checks] };
+}
+
 /** A Lane's strip of tape: the Lane's pad colour, the Project's avatar and name. */
 function Tape({ lane, lifted }: { lane: Lane; lifted?: boolean }) {
   return (
@@ -139,10 +153,12 @@ function Tape({ lane, lifted }: { lane: Lane; lifted?: boolean }) {
  * a `⋯` of the same, then the Project's Status and its Focus Gauge. */
 function LaneHead({ lane, now, drag }: { lane: Lane; now: Date; drag: BoardDrag }) {
   const { project, focus } = lane;
-  const { setFocus, openProject, newSession } = useStore();
+  const { setFocus, openProject, newSession, fixChecks } = useStore();
   const ref = useRef<HTMLDivElement>(null);
   const [lifting, setLifting] = useState(false);
   const st = pressing(project, now);
+  const mark = pullMark(project.pulls);
+  const bots = project.pulls.filter((p) => p.bot).length;
   return (
     <div className={cn("flex flex-col items-start gap-2", CELL)}>
       <div className="flex w-full items-center gap-1">
@@ -178,6 +194,11 @@ function LaneHead({ lane, now, drag }: { lane: Lane; now: Date; drag: BoardDrag 
             <DropdownMenuItem onClick={() => newSession(project.path)} className={ITEM}>
               New Session
             </DropdownMenuItem>
+            {mark?.pull.checks === "failing" && (
+              <DropdownMenuItem onClick={() => fixChecks(project.path, mark.pull.number)} className={ITEM}>
+                Fix the checks of #{mark.pull.number}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => setFocus(project.path, false)} className={ITEM}>
               Put back on the Shelf
             </DropdownMenuItem>
@@ -185,6 +206,24 @@ function LaneHead({ lane, now, drag }: { lane: Lane; now: Date; drag: BoardDrag 
         </DropdownMenu>
       </div>
       {st && <StatusMark status={st.status} count={st.count} />}
+      {/* The pull request that needs you, as a link to it: the Board never merges, GitHub does. */}
+      {(mark || bots > 0) && (
+        <div className="flex max-w-full flex-col items-start gap-1">
+          {mark && (
+            <button type="button" onClick={() => void openExternal(mark.pull.url)} className="flex max-w-full items-center gap-1.5 rounded-sm type-label-12 text-text-2 underline-offset-4 tabular-nums hover:underline">
+              <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full", mark.dot)} />
+              <span className="truncate">
+                PR #{mark.pull.number} · {mark.word}
+              </span>
+            </button>
+          )}
+          {bots > 0 && (
+            <span className="type-label-12 text-muted-foreground tabular-nums">
+              {bots} deps {bots === 1 ? "PR" : "PRs"}
+            </span>
+          )}
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <Gauge value={focus.active} max={focus.days} size={28} label={`${focus.active} of ${focus.days} days with Activity since ${day(project.focusSince!)}`} />
         <span className="type-label-12 text-muted-foreground tabular-nums">

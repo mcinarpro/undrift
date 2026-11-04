@@ -58,6 +58,7 @@ export async function watchProjects(onSnapshot: (snapshot: Snapshot) => void): P
 // The bridge checks the Project, Session and Issue against its own list before opening anything.
 export const resume = (path: string, id: string) => (inTauri ? invoke<void>("resume", { path, id }) : Promise.resolve());
 export const newSession = (path: string) => (inTauri ? invoke<void>("new_session", { path }) : Promise.resolve());
+export const fixChecks = (path: string, number: number) => (inTauri ? invoke<void>("fix_checks", { path, number }) : Promise.resolve());
 export const start = (path: string, number: number) => (inTauri ? invoke<void>("start", { path, number }) : Promise.resolve());
 /** Takes the Issue out of Doing: the bridge forgets its Start, the Session it opened runs on. */
 export const forgetStart = (path: string, number: number) => (inTauri ? invoke<void>("forget_start", { path, number }) : Promise.resolve());

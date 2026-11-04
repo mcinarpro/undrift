@@ -66,6 +66,8 @@ type State = {
   quit: () => void;
   resume: (path: string, sessionId: string) => void;
   newSession: (path: string) => void;
+  /** A terminal running `claude` on the pull request's failing checks. */
+  fixChecks: (path: string, pull: number) => void;
   /** The Board moves a Note before the bridge answers, so these say whether it did: false means
    * the Note goes back, and the toast has already said why. */
   start: (path: string, issue: number) => Promise<boolean>;
@@ -123,6 +125,7 @@ export const useStore = create<State>((set, get) => ({
   },
   resume: (path, sessionId) => void bridge.resume(path, sessionId).catch((e) => failed("resume the Session", e)),
   newSession: (path) => void bridge.newSession(path).catch((e) => failed("open a new Session", e)),
+  fixChecks: (path, pull) => void bridge.fixChecks(path, pull).catch((e) => failed("open a terminal on the checks", e)),
   start: (path, issue) => did(bridge.start(path, issue), "start the Issue"),
   setToday: (path, issue, on) => did(bridge.setToday(path, issue, on), on ? "pull the Issue into Today" : "take the Issue out of Today"),
   forgetStart: (path, issue) => did(bridge.forgetStart(path, issue), "take the Issue out of Doing"),

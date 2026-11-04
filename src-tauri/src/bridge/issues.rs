@@ -1,6 +1,7 @@
 //! What a Project's GitHub repository says about itself: its open Issues (GLOSSARY.md § Issue),
-//! read with `gh api` because `gh issue list` cannot see an Issue's blockers, and its one-line
-//! description, read with `gh repo view`. Both are read-only and under `gh::run`'s timeout.
+//! read with `gh api` because `gh issue list` cannot see an Issue's blockers, its open pull
+//! requests with the state of their checks, read with `gh pr list`, and its one-line description,
+//! read with `gh repo view`. All read-only and under `gh::run`'s timeout.
 
 use super::gh;
 use serde::{Deserialize, Serialize};
@@ -32,6 +33,30 @@ pub struct Issue {
     pub session_id: Option<String>,
     /// RFC 3339 of the moment it was closed on GitHub; `None` for an open Issue.
     pub closed_at: Option<String>,
+}
+
+/// What a pull request's checks say: none without any, pending while one runs, failing once one
+/// failed, passing once all passed.
+#[derive(Serialize, Clone, Copy, PartialEq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub enum Checks {
+    None,
+    Pending,
+    Failing,
+    Passing,
+}
+
+/// An open pull request as the Board names it. Its body, its diff and its reviewers stay on GitHub.
+#[derive(Serialize, Clone, PartialEq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Pull {
+    pub number: u32,
+    pub title: String,
+    pub url: String,
+    pub draft: bool,
+    pub checks: Checks,
+    /// Opened by a bot – Renovate, Dependabot – which the Board counts rather than names.
+    pub bot: bool,
 }
 
 /// The `owner/name` an Issue URL belongs to, so a stored URL can be checked against the open
@@ -105,6 +130,76 @@ fn parse_description(json: &str) -> Option<Option<String>> {
     Some(line.description.map(|d| d.trim().to_owned()).filter(|d| !d.is_empty()))
 }
 
+/// One pull request as `gh pr list --json` gives it.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PullLine {
+    number: u32,
+    title: String,
+    #[serde(default)]
+    url: String,
+    #[serde(default)]
+    is_draft: bool,
+    #[serde(default)]
+    status_check_rollup: Vec<Value>,
+    #[serde(default)]
+    author: Option<Author>,
+}
+
+#[derive(Deserialize, Default)]
+struct Author {
+    #[serde(default)]
+    is_bot: bool,
+    /// `app/renovate` for an app, on the `gh` versions that leave `is_bot` out.
+    #[serde(default)]
+    login: String,
+}
+
+/// The open pull requests of `owner/name`, newest first; `None` when `gh` fails, so the caller can
+/// keep what it had.
+pub fn pulls(repo: &str) -> Option<Vec<Pull>> {
+    parse_pulls(&gh::run(&["pr", "list", "--repo", repo, "--state", "open", "--limit", "20", "--json", "number,title,url,isDraft,statusCheckRollup,author"])?)
+}
+
+fn parse_pulls(json: &str) -> Option<Vec<Pull>> {
+    let lines: Vec<PullLine> = serde_json::from_str(json).ok()?;
+    Some(
+        lines
+            .into_iter()
+            .map(|l| Pull {
+                number: l.number,
+                title: l.title,
+                url: l.url,
+                draft: l.is_draft,
+                checks: checks(&l.status_check_rollup),
+                bot: l.author.as_ref().is_some_and(|a| a.is_bot || a.login.starts_with("app/")),
+            })
+            .collect(),
+    )
+}
+
+/// A check run reports its `conclusion` once done, a status context its `state`. One failure fails
+/// the lot, one still running keeps the lot pending.
+fn checks(rollup: &[Value]) -> Checks {
+    if rollup.is_empty() {
+        return Checks::None;
+    }
+    let word = |c: &Value, k: &str| c.get(k).and_then(Value::as_str).unwrap_or("").to_ascii_uppercase();
+    let mut pending = false;
+    for c in rollup {
+        let state = match word(c, "state") {
+            s if s.is_empty() => word(c, "conclusion"),
+            s => s,
+        };
+        match state.as_str() {
+            "FAILURE" | "ERROR" | "TIMED_OUT" | "CANCELLED" | "ACTION_REQUIRED" | "STARTUP_FAILURE" => return Checks::Failing,
+            "SUCCESS" | "SKIPPED" | "NEUTRAL" => {}
+            _ => pending = true,
+        }
+    }
+    if pending { Checks::Pending } else { Checks::Passing }
+}
+
 fn parse(json: &str) -> Option<Vec<Issue>> {
     let lines: Vec<IssueLine> = serde_json::from_str(json).ok()?;
     Some(
@@ -130,6 +225,16 @@ fn parse(json: &str) -> Option<Vec<Issue>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_pull_request_reads_its_checks_and_its_author() {
+        let json = r#"[{"number":44,"title":"feat: open on the last Khatm","url":"https://github.com/o/r/pull/44","isDraft":false,"author":{"is_bot":false,"login":"mcinarpro"},"statusCheckRollup":[{"__typename":"CheckRun","status":"COMPLETED","conclusion":"FAILURE"},{"__typename":"CheckRun","status":"IN_PROGRESS","conclusion":""}]},{"number":397,"title":"fix(deps)","url":"https://github.com/o/r/pull/397","isDraft":true,"author":{"login":"app/renovate"},"statusCheckRollup":[]}]"#;
+        let pulls = parse_pulls(json).unwrap();
+        assert_eq!((pulls[0].checks, pulls[0].bot), (Checks::Failing, false));
+        assert_eq!((pulls[1].checks, pulls[1].bot, pulls[1].draft), (Checks::None, true, true));
+        assert_eq!(checks(&[serde_json::json!({"__typename":"StatusContext","state":"PENDING"})]), Checks::Pending);
+        assert_eq!(checks(&[serde_json::json!({"__typename":"CheckRun","status":"COMPLETED","conclusion":"SUCCESS"})]), Checks::Passing);
+    }
 
     #[test]
     fn keeps_number_title_label_names_url_and_open_blockers() {

@@ -28,6 +28,21 @@ export type OpenSession = {
   statusSince: string | null;
 };
 
+/** What a pull request's checks say: none without any, pending while one runs, failing once one
+ * failed, passing once all passed. */
+export type Checks = "none" | "pending" | "failing" | "passing";
+
+/** An open pull request of the Project's repository. */
+export type Pull = {
+  number: number;
+  title: string;
+  url: string;
+  draft: boolean;
+  checks: Checks;
+  /** Opened by a bot – Renovate, Dependabot – which the Board counts rather than names. */
+  bot: boolean;
+};
+
 /** Lines added and removed in tracked files since the last commit. */
 export type DiffStat = {
   insertions: number;
@@ -112,6 +127,8 @@ export type Project = {
   issues: Issue[];
   /** The Issues closed in the last week, the Board's Done; empty without a GitHub remote. */
   closed: Issue[];
+  /** Open pull requests, newest first; empty without a GitHub remote. */
+  pulls: Pull[];
   /** Whether Home lists it as a Loose End, Let Go already applied. */
   looseEnd: boolean;
   /** What every Session reads before its first prompt; null when the folder has nothing. */

@@ -49,7 +49,7 @@ _Avoid_: Kanban, sprint, dashboard, desk
 
 **Lane**:
 A Project in Focus as a row of the Board: its strip of tape on the left – the Project, its Status,
-its Focus Gauge – then its Notes in Ready, Today and Doing, and in Doing its Cards.
+the pull request that needs it, its Focus Gauge – then its Notes in Ready, Today and Doing, and in Doing its Cards.
 Its paper is its place: the first Lane's pad is yellow, the second pink, the third green, the
 fourth lavender. Its tape dragged onto the Shelf takes the Project out of Focus.
 _Avoid_: Swimlane, row, timeline
