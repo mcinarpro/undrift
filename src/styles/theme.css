@@ -50,6 +50,41 @@
   --ud-shadow-medium: 0 0 0 1px var(--ud-line), 0 2px 2px #0000000a, 0 8px 8px -8px #0000000a;
   --ud-shadow-menu: 0 0 0 1px var(--ud-line), 0 1px 1px #00000005, 0 4px 8px -4px #0000000a, 0 16px 24px -8px #0000000f;
   --ud-shadow-modal: 0 0 0 1px var(--ud-line), 0 1px 1px #00000005, 0 8px 16px -4px #0000000a, 0 24px 32px -8px #0000000f;
+
+  /* v2 – the paper of the post-its: a pad per kind, ink that stays dark on every pad. Paper keeps
+     its colours in dark too, because lit paper is the one place the theme does not reach. */
+  --ud-pad-yellow: #fff59d;
+  --ud-pad-pink: #ffd3e3;
+  --ud-pad-green: #d6f1cc;
+  --ud-pad-lavender: #e6ddff;
+  --ud-ink: #1c1c1c;
+  --ud-ink-2: #444444;
+  --ud-shadow-paper: 0 1px 1px #0000001a, 0 4px 10px -4px #0000004d;
+  /* v2 – a colour per channel of the day: the Sprint, another Project, Life, a habit, maintenance.
+     The line marks a task and a time block; the tint fills the block. */
+  --ud-ch-sprint: #c2410c;
+  --ud-ch-project: #0f766e;
+  --ud-ch-life: #db2777;
+  --ud-ch-habit: #16a34a;
+  --ud-ch-rest: #64748b;
+  --ud-ch-sprint-tint: #c2410c14;
+  --ud-ch-project-tint: #0f766e14;
+  --ud-ch-life-tint: #db277714;
+  --ud-ch-habit-tint: #16a34a14;
+  --ud-ch-rest-tint: #64748b14;
+  /* v2 – the integrated terminal wears Catppuccin: Latte with the light window. */
+  --ud-term-bg: #eff1f5;
+  --ud-term-bar: #e6e9ef;
+  --ud-term-tab: #ccd0da;
+  --ud-term-edge: #bcc0cc;
+  --ud-term-text: #4c4f69;
+  --ud-term-sub: #6c6f85;
+  --ud-term-dim: #8c8fa1;
+  --ud-term-red: #d20f39;
+  --ud-term-green: #40a02b;
+  --ud-term-blue: #1e66f5;
+  --ud-term-peach: #fe640b;
+  --ud-term-cursor: #dc8a78;
 }
 
 :root[data-theme="dark"] {
@@ -94,6 +129,37 @@
   --ud-shadow-medium: 0 0 0 1px var(--ud-line), 0 2px 2px #00000052, 0 8px 8px -8px #00000029;
   --ud-shadow-menu: 0 0 0 1px var(--ud-line), 0 1px 1px #00000005, 0 4px 8px -4px #0000000a, 0 16px 24px -8px #0000000f;
   --ud-shadow-modal: 0 0 0 1px var(--ud-line), 0 1px 1px #00000005, 0 8px 16px -4px #0000000a, 0 24px 32px -8px #0000000f;
+
+  --ud-pad-yellow: #fff59d;
+  --ud-pad-pink: #ffd3e3;
+  --ud-pad-green: #d6f1cc;
+  --ud-pad-lavender: #e6ddff;
+  --ud-ink: #1c1c1c;
+  --ud-ink-2: #444444;
+  --ud-shadow-paper: 0 1px 1px #00000033, 0 4px 10px -4px #00000080;
+  --ud-ch-sprint: #fb923c;
+  --ud-ch-project: #2dd4bf;
+  --ud-ch-life: #f472b6;
+  --ud-ch-habit: #4ade80;
+  --ud-ch-rest: #94a3b8;
+  --ud-ch-sprint-tint: #f9731626;
+  --ud-ch-project-tint: #14b8a626;
+  --ud-ch-life-tint: #ec489926;
+  --ud-ch-habit-tint: #22c55e26;
+  --ud-ch-rest-tint: #94a3b826;
+  /* Catppuccin Mocha with the dark window. */
+  --ud-term-bg: #1e1e2e;
+  --ud-term-bar: #181825;
+  --ud-term-tab: #313244;
+  --ud-term-edge: #45475a;
+  --ud-term-text: #cdd6f4;
+  --ud-term-sub: #a6adc8;
+  --ud-term-dim: #7f849c;
+  --ud-term-red: #f38ba8;
+  --ud-term-green: #a6e3a1;
+  --ud-term-blue: #89b4fa;
+  --ud-term-peach: #fab387;
+  --ud-term-cursor: #f5e0dc;
 }
 
 /* Wide-gamut panels get Geist's own P3 blues and amber; sRGB panels keep the hex values above. */

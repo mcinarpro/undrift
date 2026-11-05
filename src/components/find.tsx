@@ -6,9 +6,10 @@ import type { ThemeChoice } from "@/lib/theme";
 import { useStore, type Page } from "@/store";
 
 const PAGES: { page: Page; label: string; icon: IconName }[] = [
-  { page: "home", label: "Home", icon: "home" },
+  { page: "today", label: "Today", icon: "home" },
+  { page: "week", label: "Week", icon: "week" },
   { page: "projects", label: "Projects", icon: "projects" },
-  { page: "graph", label: "Graph", icon: "graph" },
+  { page: "sessions", label: "Sessions", icon: "sessions" },
   { page: "settings", label: "Settings", icon: "settings" },
 ];
 

@@ -1,7 +1,6 @@
 import {
-  ChevronsUpDown,
-  Bot,
-  Ellipsis,
+  CalendarDays,
+  Check,
   ExternalLink,
   Folders,
   House,
@@ -9,10 +8,12 @@ import {
   Minus,
   Monitor,
   Moon,
-  Network,
+  Play,
+  Plus,
   Search,
   Settings,
   Square,
+  SquareTerminal,
   Sun,
   X,
 } from "lucide-react";
@@ -23,7 +24,6 @@ import {
 const ICONS = {
   home: House,
   projects: Folders,
-  graph: Network,
   settings: Settings,
   search: Search,
   system: Monitor,
@@ -34,6 +34,11 @@ const ICONS = {
   minimize: Minus,
   maximize: Square,
   close: X,
+  check: Check,
+  play: Play,
+  plus: Plus,
+  week: CalendarDays,
+  sessions: SquareTerminal,
 } as const;
 
 export type IconName = keyof typeof ICONS;

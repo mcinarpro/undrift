@@ -128,6 +128,25 @@
    reads an unknown text-* class as a colour and drops it next to a real one. The sans styles leave
    the family to html, so a font-mono beside them still applies. A <strong> inside picks out a part
    of the text, as in Geist (DESIGN.md § Type). */
+/* v2 – a post-it: the pad in --pad, a darker band on top where it was torn off, a faint grain, and
+   the paper shadow. Its ink is its own in both themes. */
+@utility paper {
+    background-color: var(--pad, var(--ud-pad-yellow));
+    background-image:
+        linear-gradient(to bottom, #00000018 0, #0000000a 12px, transparent 18px),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    color: var(--ud-ink);
+    box-shadow: var(--ud-shadow-paper);
+    border-radius: 2px;
+}
+
+/* v2 – a board's ground: a dot every 20 px, a grain under the paper rather than a grid over it. */
+@utility dotted {
+    background-image: radial-gradient(var(--ud-alpha-400) 1px, transparent 1.5px);
+    background-size: 20px 20px;
+    background-position: 10px 10px;
+}
+
 @utility type-heading-32 {
     font-size: 32px;
     line-height: 40px;

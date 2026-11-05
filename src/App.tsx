@@ -2,6 +2,10 @@ import { useEffect } from "react";
 import { Find } from "@/components/find";
 import { Header } from "@/components/topbar";
 import { Placeholder } from "@/pages/placeholder";
+import { Projects } from "@/pages/projects";
+import { Sessions } from "@/pages/sessions";
+import { Today } from "@/pages/today";
+import { Week } from "@/pages/week";
 import { useStore } from "@/store";
 
 // Only text entry swallows the shortcuts: a focused radio or button takes no letters, so F and
@@ -34,8 +38,10 @@ export default function App() {
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
       <Header />
-      <main key={page} className="min-h-0 grow overflow-y-auto">
-        <Placeholder page={page} />
+      {/* Keyed by the page, so a new page opens scrolled to its top. Today and Week fill the window
+          and scroll inside their columns; the others scroll as a page. */}
+      <main key={page} className={page === "today" || page === "week" ? "min-h-0 grow overflow-hidden" : "min-h-0 grow overflow-y-auto"}>
+        {page === "today" ? <Today /> : page === "week" ? <Week /> : page === "projects" ? <Projects /> : page === "sessions" ? <Sessions /> : <Placeholder page={page} />}
       </main>
       <Find />
     </div>
